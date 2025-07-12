@@ -1,7 +1,42 @@
 {
-  "timeline_index": 2,
+  "timeline_index": 30,
+  "planner": {},
+  "gallery_last_file": {},
+  "timeline_status": {
+    "3": 1,
+    "5": 1,
+    "4": 1,
+    "7": 1,
+    "6": 1,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0,
+    "13": 1,
+    "14": 1,
+    "15": 0,
+    "16": 0,
+    "17": 0,
+    "18": 0,
+    "19": 1,
+    "20": 1,
+    "21": 1,
+    "22": 1,
+    "23": 1,
+    "25": 1,
+    "24": 1,
+    "26": 1,
+    "27": 1,
+    "28": 1,
+    "29": 1,
+    "30": 1
+  },
+  "preview_servers": {},
   "preview_server": {
     "project_dir": "/workspace/shadcn-ui",
+    "status": "initializing",
+    "config_path": ".mgx/config.yaml",
     "timeline_index": 2
   }
 }
