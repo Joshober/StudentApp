@@ -66,7 +66,7 @@ export const storeFile = async (file: File): Promise<FileUpload> => {
     type: file.type,
     size: file.size,
     url,
-    content,
-    createdAt: new Date(),
+    content: content || undefined,
+    createdAt: new Date().toISOString(), // Store as ISO string
   };
 };

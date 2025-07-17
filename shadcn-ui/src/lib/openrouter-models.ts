@@ -4,6 +4,22 @@ import { OpenRouterModel } from '@/types';
 export const OPENROUTER_MODELS: OpenRouterModel[] = [
   // Free models
   {
+    id: 'deepseek-ai/deepseek-coder-6.7b-instruct:free',
+    name: 'DeepSeek Coder 6.7B (Free)',
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 16384,
+    architecture: { modality: 'text', tokenizer: 'DeepSeek' },
+    top_provider: { is_moderated: false }
+  },
+  {
+    id: 'microsoft/phi-3-medium-128k-instruct:free',
+    name: 'Phi-3 Medium 128K Instruct (Free)',
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 128000,
+    architecture: { modality: 'text', tokenizer: 'Phi3' },
+    top_provider: { is_moderated: false }
+  },
+  {
     id: 'meta-llama/llama-3.2-3b-instruct:free',
     name: 'Llama 3.2 3B Instruct (Free)',
     pricing: { prompt: '0', completion: '0' },
@@ -20,6 +36,14 @@ export const OPENROUTER_MODELS: OpenRouterModel[] = [
     top_provider: { is_moderated: false }
   },
   {
+    id: 'microsoft/phi-3-mini-128k-instruct:free',
+    name: 'Phi-3 Mini 128K Instruct (Free)',
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 128000,
+    architecture: { modality: 'text', tokenizer: 'Phi3' },
+    top_provider: { is_moderated: false }
+  },
+  {
     id: 'qwen/qwen-2-7b-instruct:free',
     name: 'Qwen 2 7B Instruct (Free)',
     pricing: { prompt: '0', completion: '0' },
@@ -28,19 +52,27 @@ export const OPENROUTER_MODELS: OpenRouterModel[] = [
     top_provider: { is_moderated: false }
   },
   {
-    id: 'microsoft/phi-3-medium-128k-instruct:free',
-    name: 'Phi-3 Medium 128K Instruct (Free)',
+    id: 'google/gemma-2-9b-it:free',
+    name: 'Gemma 2 9B Instruct (Free)',
     pricing: { prompt: '0', completion: '0' },
-    context_length: 128000,
-    architecture: { modality: 'text', tokenizer: 'Phi3' },
+    context_length: 8192,
+    architecture: { modality: 'text', tokenizer: 'Gemma' },
     top_provider: { is_moderated: false }
   },
   {
-    id: 'microsoft/phi-3-mini-128k-instruct:free',
-    name: 'Phi-3 Mini 128K Instruct (Free)',
+    id: 'google/gemma-2-2b-it:free',
+    name: 'Gemma 2 2B Instruct (Free)',
     pricing: { prompt: '0', completion: '0' },
-    context_length: 128000,
-    architecture: { modality: 'text', tokenizer: 'Phi3' },
+    context_length: 8192,
+    architecture: { modality: 'text', tokenizer: 'Gemma' },
+    top_provider: { is_moderated: false }
+  },
+  {
+    id: 'mistralai/mistral-7b-instruct:free',
+    name: 'Mistral 7B Instruct (Free)',
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 32768,
+    architecture: { modality: 'text', tokenizer: 'Mistral' },
     top_provider: { is_moderated: false }
   },
   // Popular paid models

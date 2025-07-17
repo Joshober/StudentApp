@@ -1,5 +1,8 @@
-import { useState } from 'react';
+"use client";
+
+import { useState, useEffect } from 'react';
 import { useAISettings } from '@/context/AISettingsContext';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,41 +21,81 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Info } from 'lucide-react';
+import { Settings, Info, Loader2 } from 'lucide-react';
 import { OPENROUTER_MODELS, getFreeModels, getPaidModels, formatModelPrice } from '@/lib/openrouter-models';
 
-export const AISettingsPanel = () => {
-  const { settings, updateSettings, setApiKey } = useAISettings();
+const AISettingsPanel = () => {
+  const { settings, updateSettings } = useAISettings();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeySource, setApiKeySource] = useState<'environment' | 'user' | null>(null);
+  const [dynamicModels, setDynamicModels] = useState<any[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isLoadingApiKey, setIsLoadingApiKey] = useState(false);
   
-  const freeModels = getFreeModels();
+  // Fallback to static models if dynamic fetch fails
+  const freeModels = dynamicModels.length > 0 ? dynamicModels : getFreeModels();
   const paidModels = getPaidModels();
-  
-  const handleSaveSettings = () => {
-    // If API key was entered, save it
-    if (apiKeyInput) {
-      setApiKey(apiKeyInput);
+
+  // Check API key source and fetch models when user changes - with caching
+  useEffect(() => {
+    if (user?.id) {
+      // Only fetch if we haven't already loaded data for this user
+      if (apiKeySource === null) {
+        checkApiKeySource();
+      }
+      if (dynamicModels.length === 0) {
+        fetchDynamicModels();
+      }
     }
-    setOpen(false);
+  }, [user?.id]); // Only depend on user.id, not the entire user object
+
+  const checkApiKeySource = async () => {
+    if (!user?.id || isLoadingApiKey) return;
+    
+    setIsLoadingApiKey(true);
+    try {
+      const response = await fetch(`/api/user/api-key-status?userId=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeySource(data.source);
+      }
+    } catch (error) {
+      console.error('Failed to check API key source:', error);
+    } finally {
+      setIsLoadingApiKey(false);
+    }
   };
 
-  const handleProviderChange = (provider: 'openai' | 'anthropic' | 'openrouter') => {
-    updateSettings({ provider });
-    // Set default model based on provider
-    if (provider === 'openrouter') {
-      updateSettings({ model: 'meta-llama/llama-3.2-3b-instruct:free' });
-    } else if (provider === 'openai') {
-      updateSettings({ model: 'gpt-4o-mini' });
-    } else if (provider === 'anthropic') {
-      updateSettings({ model: 'claude-3-haiku-20240307' });
+  const fetchDynamicModels = async () => {
+    if (!user?.id || isLoadingModels) return;
+    
+    setIsLoadingModels(true);
+    try {
+      const response = await fetch(`/api/openrouter/models?userId=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Deduplicate models by ID to prevent React key conflicts
+        const uniqueModels = data.models?.filter((model: any, index: number, self: any[]) => 
+          index === self.findIndex((m: any) => m.id === model.id)
+        ) || [];
+        setDynamicModels(uniqueModels);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dynamic models:', error);
+      // Fallback to static models
+    } finally {
+      setIsLoadingModels(false);
     }
+  };
+  
+  const handleSaveSettings = () => {
+    setOpen(false);
   };
 
   return (
@@ -74,159 +117,90 @@ export const AISettingsPanel = () => {
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="provider">AI Provider</Label>
-            <Select
-              value={settings.provider}
-              onValueChange={handleProviderChange}
-            >
-              <SelectTrigger id="provider">
-                <SelectValue placeholder="Select a provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="openrouter">
-                    <div className="flex items-center gap-2">
-                      <span>OpenRouter</span>
-                      <Badge variant="secondary" className="text-xs">Recommended</Badge>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {settings.provider === 'openrouter' && (
-            <div className="grid gap-2">
-              <Label htmlFor="model">Model Selection</Label>
-              <Select
-                value={settings.model}
-                onValueChange={(value) => updateSettings({ model: value })}
-              >
-                <SelectTrigger id="model">
-                  <SelectValue placeholder="Select a model" />
-                </SelectTrigger>
-                <SelectContent className="max-h-80">
-                  <SelectGroup>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-green-600 flex items-center gap-2">
-                      <Info className="h-3 w-3" />
-                      Free Models
-                    </div>
-                    {freeModels.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{model.name}</span>
-                            <Badge variant="outline" className="text-xs text-green-600 border-green-200">
-                              FREE
-                            </Badge>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {model.context_length.toLocaleString()} tokens context
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <Separator className="my-2" />
-                  <SelectGroup>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-blue-600 flex items-center gap-2">
-                      <Info className="h-3 w-3" />
-                      Premium Models
-                    </div>
-                    {paidModels.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{model.name}</span>
-                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
-                              PAID
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            <div>{formatModelPrice(model)}</div>
-                            <div>{model.context_length.toLocaleString()} tokens context</div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <div className="text-xs text-muted-foreground mt-1">
-                <Info className="h-3 w-3 inline mr-1" />
-                Free models don't require payment, but may have usage limits.
+            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">OpenRouter</span>
+                <Badge variant="secondary" className="text-xs">Recommended</Badge>
+              </div>
+              <div className="text-xs text-blue-600 ml-auto">
+                Multiple free models available
               </div>
             </div>
-          )}
-
-          {settings.provider !== 'openrouter' && (
-            <div className="grid gap-2">
-              <Label htmlFor="model">Model</Label>
-              <Select
-                value={settings.model}
-                onValueChange={(value) => updateSettings({ model: value })}
-              >
-                <SelectTrigger id="model">
-                  <SelectValue placeholder="Select a model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {settings.provider === 'openai' && (
-                      <>
-                        <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                        <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                        <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                        <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                      </>
-                    )}
-                    {settings.provider === 'anthropic' && (
-                      <>
-                        <SelectItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</SelectItem>
-                        <SelectItem value="claude-3-haiku-20240307">Claude 3 Haiku</SelectItem>
-                        <SelectItem value="claude-3-opus-20240229">Claude 3 Opus</SelectItem>
-                      </>
-                    )}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          
-          <div className="grid gap-2">
-            <Label htmlFor="apiKey">
-              API Key
-              {settings.provider === 'openrouter' && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Get free key at openrouter.ai)
-                </span>
-              )}
-            </Label>
-            <Input
-              id="apiKey"
-              type="password"
-              placeholder={
-                settings.provider === 'openrouter' 
-                  ? "sk-or-v1-..." 
-                  : "Enter your API key"
-              }
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-            />
-            {settings.provider === 'openrouter' && (
-              <div className="text-xs text-muted-foreground">
-                <a 
-                  href="https://openrouter.ai/keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  Get your free OpenRouter API key here
-                </a>
+            {apiKeySource && (
+              <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                <div className="text-xs text-green-700">
+                  <span className="font-medium">API Key:</span> {apiKeySource === 'user' ? 'User-provided' : apiKeySource === 'environment' ? 'Environment variable' : 'Not configured'}
+                </div>
+                <Badge variant="outline" className={`text-xs ${apiKeySource === 'environment' ? 'text-green-600 border-green-200' : apiKeySource === 'user' ? 'text-purple-600 border-purple-200' : 'text-gray-600 border-gray-200'}`}>
+                  {apiKeySource === 'environment' ? 'PRIORITY' : apiKeySource === 'user' ? 'FALLBACK' : 'NONE'}
+                </Badge>
               </div>
             )}
           </div>
-          
+
+          <div className="grid gap-2">
+            <Label htmlFor="model">AI Model Selection</Label>
+            <Select
+              value={settings.model}
+              onValueChange={(value) => updateSettings({ model: value })}
+            >
+              <SelectTrigger id="model">
+                <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                <SelectGroup>
+                  <div className="px-2 py-1.5 text-sm font-semibold text-green-600 flex items-center gap-2">
+                    <Info className="h-3 w-3" />
+                    Free Models (Recommended)
+                    {isLoadingModels && <Loader2 className="h-3 w-3 animate-spin" />}
+                  </div>
+                  {freeModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{model.name}</span>
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                            FREE
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {model.context_length?.toLocaleString() || 'Unknown'} tokens context
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <Separator className="my-2" />
+                <SelectGroup>
+                  <div className="px-2 py-1.5 text-sm font-semibold text-blue-600 flex items-center gap-2">
+                    <Info className="h-3 w-3" />
+                    Premium Models (Paid)
+                  </div>
+                  {paidModels.slice(0, 5).map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{model.name}</span>
+                          <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                            PAID
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <div>{formatModelPrice(model)}</div>
+                          <div>{model.context_length.toLocaleString()} tokens context</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <div className="text-xs text-muted-foreground mt-1">
+              <Info className="h-3 w-3 inline mr-1" />
+              Free models don't require payment. DeepSeek Coder is great for programming help!
+            </div>
+          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="teachingStyle">Teaching Style</Label>
             <Select
@@ -310,3 +284,5 @@ export const AISettingsPanel = () => {
     </Dialog>
   );
 };
+
+export default AISettingsPanel;

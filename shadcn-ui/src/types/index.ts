@@ -1,4 +1,4 @@
-export type AIProvider = 'openai' | 'anthropic' | 'openrouter';
+export type AIProvider = 'openrouter';
 
 export interface OpenRouterModel {
   id: string;
@@ -41,7 +41,7 @@ export interface FileUpload {
   size: number;
   url?: string;
   content?: string;
-  createdAt: Date;
+  createdAt: string; // Changed from Date to string
 }
 
 export interface StudySession {
@@ -50,12 +50,12 @@ export interface StudySession {
   subject?: string;
   files: FileUpload[];
   messages: Message[];
-  createdAt: Date;
+  createdAt: string; // Changed from Date to string
 }
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp: string; // Changed from Date to string
 }

@@ -1,11 +1,13 @@
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { AISettings, AIProvider } from '@/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
+import { getAIProviderKey } from '@/lib/config';
+import { getEnvironmentStatus } from '@/lib/env-check';
 
 // Default settings
 const defaultSettings: AISettings = {
   provider: 'openrouter',
-  model: 'meta-llama/llama-3.2-3b-instruct:free',
+  model: 'meta-llama/llama-3.2-3b-instruct:free', // More reliable default model
   temperature: 0.7,
   maxTokens: 2000,
   teachingStyle: 'socratic',
@@ -17,7 +19,6 @@ const defaultSettings: AISettings = {
 interface AISettingsContextType {
   settings: AISettings;
   updateSettings: (newSettings: Partial<AISettings>) => void;
-  setProvider: (provider: AIProvider) => void;
   setApiKey: (key: string) => void;
   clearApiKey: () => void;
   hasApiKey: boolean;
@@ -28,19 +29,34 @@ const AISettingsContext = createContext<AISettingsContextType | undefined>(undef
 // Provider component
 export const AISettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useLocalStorage<AISettings>('ai-settings', defaultSettings);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(!!settings.apiKey);
+  
+  // Initialize hasApiKey by checking both stored key and environment variables
+  const [hasApiKey, setHasApiKey] = useState<boolean>(() => {
+    const hasStoredKey = !!settings.apiKey;
+    const hasEnvKey = !!getAIProviderKey(settings.provider);
+    return hasStoredKey || hasEnvKey;
+  });
 
-  // Check for API key on mount
+  // Check for API key on mount and from environment variables
   useEffect(() => {
-    setHasApiKey(!!settings.apiKey);
-  }, [settings.apiKey]);
+    const hasStoredKey = !!settings.apiKey;
+    const hasEnvKey = !!getAIProviderKey(settings.provider);
+    const hasKey = hasStoredKey || hasEnvKey;
+    setHasApiKey(hasKey);
+    
+    // Check environment variables and provide helpful feedback
+    const envStatus = getEnvironmentStatus();
+    
+    // Log for debugging only if no key is found
+    if (hasEnvKey && !hasStoredKey) {
+      console.log(`✅ API key detected from environment variables for ${settings.provider}`);
+    } else if (!hasKey) {
+      console.warn(`⚠️ No API key found for ${settings.provider}. Please set OPENROUTER_API_KEY in your .env.local file or add one in settings.`);
+    }
+  }, [settings.apiKey, settings.provider]);
 
   const updateSettings = (newSettings: Partial<AISettings>) => {
     setSettings({ ...settings, ...newSettings });
-  };
-
-  const setProvider = (provider: AIProvider) => {
-    setSettings({ ...settings, provider });
   };
 
   const setApiKey = (apiKey: string) => {
@@ -56,7 +72,6 @@ export const AISettingsProvider = ({ children }: { children: ReactNode }) => {
     <AISettingsContext.Provider value={{ 
       settings, 
       updateSettings, 
-      setProvider, 
       setApiKey, 
       clearApiKey, 
       hasApiKey 

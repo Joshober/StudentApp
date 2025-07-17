@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { useStudySession } from '@/context/StudySessionContext';
 import { Button } from '@/components/ui/button';

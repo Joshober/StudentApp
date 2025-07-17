@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect } from 'react';
 import { useStudySession } from '@/context/StudySessionContext';
 import { useAISettings } from '@/context/AISettingsContext';
@@ -92,9 +94,11 @@ export const ChatInterface = () => {
                     : "bg-muted mr-auto"
                 )}
               >
-                <ReactMarkdown className="prose prose-sm dark:prose-invert">
-                  {msg.content}
-                </ReactMarkdown>
+                <div className="prose prose-sm dark:prose-invert">
+                  <ReactMarkdown>
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
                 <div className="text-xs mt-1 opacity-70">
                   {new Date(msg.timestamp).toLocaleTimeString()}
                 </div>

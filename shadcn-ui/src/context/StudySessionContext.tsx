@@ -34,7 +34,7 @@ export const StudySessionProvider = ({ children }: { children: ReactNode }) => {
       subject,
       files: [],
       messages: [],
-      createdAt: new Date()
+      createdAt: new Date().toISOString() // Store as ISO string
     };
     
     setSessions([...sessions, newSession]);
@@ -88,7 +88,7 @@ export const StudySessionProvider = ({ children }: { children: ReactNode }) => {
       id: uuidv4(),
       role,
       content,
-      timestamp: new Date()
+      timestamp: new Date().toISOString() // Store as ISO string
     };
     
     const updatedSessions = sessions.map(session => {

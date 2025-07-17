@@ -1,4 +1,5 @@
 import { AIProvider, AISettings } from '@/types';
+import { getAIProviderKey } from './config';
 
 // Helper function to create teaching context based on settings
 const createTeachingContext = (settings: AISettings, files: string[]) => {
@@ -27,158 +28,97 @@ ${settings.includeExamples ? 'Include relevant examples to illustrate your point
   return context;
 };
 
-// OpenAI API implementation
-export const callOpenAI = async (
-  prompt: string, 
-  files: string[], 
-  settings: AISettings
-) => {
-  try {
-    if (!settings.apiKey) {
-      throw new Error('OpenAI API key is required');
-    }
-
-    const context = createTeachingContext(settings, files);
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${settings.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: settings.model || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: context },
-          { role: 'user', content: prompt }
-        ],
-        temperature: settings.temperature || 0.7,
-        max_tokens: settings.maxTokens || 2000,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'OpenAI API request failed');
-    }
-
-    const data = await response.json();
-    return data.choices[0]?.message?.content || 'No response generated';
-  } catch (error) {
-    console.error('Error calling OpenAI:', error);
-    throw new Error(`Failed to get response from OpenAI: ${error.message}`);
-  }
-};
-
-// Anthropic API implementation
-export const callAnthropic = async (
-  prompt: string, 
-  files: string[], 
-  settings: AISettings
-) => {
-  try {
-    if (!settings.apiKey) {
-      throw new Error('Anthropic API key is required');
-    }
-
-    const context = createTeachingContext(settings, files);
-    
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${settings.apiKey}`,
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: settings.model || 'claude-3-haiku-20240307',
-        max_tokens: settings.maxTokens || 2000,
-        temperature: settings.temperature || 0.7,
-        messages: [
-          { role: 'user', content: `${context}\n\nStudent question: ${prompt}` }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Anthropic API request failed');
-    }
-
-    const data = await response.json();
-    return data.content[0]?.text || 'No response generated';
-  } catch (error) {
-    console.error('Error calling Anthropic:', error);
-    throw new Error(`Failed to get response from Anthropic: ${error.message}`);
-  }
-};
-
-// OpenRouter API implementation
+// OpenRouter API implementation with fallback models
 export const callOpenRouter = async (
   prompt: string, 
   files: string[], 
-  settings: AISettings
+  settings: AISettings,
+  userId?: number
 ) => {
-  try {
-    if (!settings.apiKey) {
-      throw new Error('OpenRouter API key is required');
-    }
+  const modelsToTry = [settings.model, ...FALLBACK_MODELS];
+  
+  for (const model of modelsToTry) {
+    try {
+      // Always use the server API route
+      const context = createTeachingContext(settings, files);
+      const response = await fetch('/api/openrouter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          model,
+          settings: { ...settings, context },
+          userId,
+        }),
+      });
 
-    const context = createTeachingContext(settings, files);
-    
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${settings.apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'AI Homework Tutor',
-      },
-      body: JSON.stringify({
-        model: settings.model || 'meta-llama/llama-3.2-3b-instruct:free',
-        messages: [
-          { role: 'system', content: context },
-          { role: 'user', content: prompt }
-        ],
-        temperature: settings.temperature || 0.7,
-        max_tokens: settings.maxTokens || 2000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = 'OpenRouter API request failed';
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorMessage;
-      } catch {
-        errorMessage = errorText || errorMessage;
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'OpenRouter API request failed';
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorJson.message || errorMessage;
+          
+          // Handle token limit error specifically
+          if (response.status === 403 && errorJson.error?.includes('Token limit exceeded')) {
+            throw new Error('You have used all your available tokens. Please contact support to get more tokens.');
+          }
+          
+          // Handle invalid model ID error - try next model
+          if (response.status === 400 && errorJson.error?.includes('not a valid model ID')) {
+            console.warn(`Model ${model} not available, trying next model...`);
+            continue; // Try next model
+          }
+        } catch (parseError) {
+          errorMessage = errorText || errorMessage;
+        }
+        
+        // If it's not a model ID error, throw the error
+        if (!errorMessage.includes('not a valid model ID')) {
+          const finalErrorMessage = `${response.status}: ${errorMessage}`;
+          throw new Error(finalErrorMessage);
+        }
+      } else {
+        // Success! Return the response
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || 'No response generated';
       }
-      throw new Error(errorMessage);
+    } catch (error) {
+      // If this is the last model to try, throw the error
+      if (model === modelsToTry[modelsToTry.length - 1]) {
+        console.error('Error calling OpenRouter:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Failed to get response from OpenRouter: ${errorMessage}`);
+      }
+      // Otherwise, continue to next model
+      console.warn(`Failed with model ${model}, trying next model...`);
     }
-
-    const data = await response.json();
-    return data.choices[0]?.message?.content || 'No response generated';
-  } catch (error) {
-    console.error('Error calling OpenRouter:', error);
-    throw new Error(`Failed to get response from OpenRouter: ${error.message}`);
   }
+  
+  // If we get here, all models failed
+  throw new Error('All available models failed. Please try again later.');
 };
+
+// Fallback models if the selected model fails
+const FALLBACK_MODELS = [
+  'meta-llama/llama-3.2-3b-instruct:free',
+  'microsoft/phi-3-medium-128k-instruct:free',
+  'microsoft/phi-3-mini-128k-instruct:free',
+  'qwen/qwen-2-7b-instruct:free'
+];
 
 export const getAIResponse = async (
   provider: AIProvider, 
   prompt: string, 
   files: string[], 
-  settings: AISettings
+  settings: AISettings,
+  userId?: number
 ) => {
-  switch (provider) {
-    case 'openai':
-      return callOpenAI(prompt, files, settings);
-    case 'anthropic':
-      return callAnthropic(prompt, files, settings);
-    case 'openrouter':
-      return callOpenRouter(prompt, files, settings);
-    default:
-      throw new Error(`Unsupported AI provider: ${provider}`);
+  if (provider === 'openrouter') {
+    return callOpenRouter(prompt, files, settings, userId);
   }
+  throw new Error(`Unsupported AI provider: ${provider}`);
 };
