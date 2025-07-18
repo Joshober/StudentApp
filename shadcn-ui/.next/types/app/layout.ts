@@ -1,4 +1,4 @@
-// File: C:\Users\Josh\Downloads\Student Material Support\workspace\shadcn-ui\src\app\layout.tsx
+// File: /Users/dusti/dev/joshober/StudentApp/shadcn-ui/src/app/layout.tsx
 import * as entry from '../../../src/app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

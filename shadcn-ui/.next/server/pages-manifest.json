@@ -1,9 +1,5 @@
 {
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
-  "/api/user/token-status": "pages/api/user/token-status.js",
-  "/api/user/api-key-status": "pages/api/user/api-key-status.js",
-  "/api/openrouter/models": "pages/api/openrouter/models.js",
-  "/api/openrouter": "pages/api/openrouter.js"
+  "/_document": "pages/_document.js"
 }

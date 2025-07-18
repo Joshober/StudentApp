@@ -1,33 +1,44 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, BookOpen, Calendar, Mail, User, LogIn, LogOut, Menu, X, Brain } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/AuthContext';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Home,
+  BookOpen,
+  Calendar,
+  Mail,
+  User,
+  LogIn,
+  LogOut,
+  Menu,
+  X,
+  Brain,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 const Navigation: React.FC = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  
+
   const navigationItems = [
-    { path: '/', label: 'Home', icon: Home },
-    { path: '/resources', label: 'Resources', icon: BookOpen },
-    { path: '/events', label: 'Events', icon: Calendar },
-    { path: '/contact', label: 'Contact', icon: Mail },
+    { path: "/", label: "Home", icon: Home },
+    { path: "/resources", label: "Resources", icon: BookOpen },
+    { path: "/events", label: "Events", icon: Calendar },
+    { path: "/contact", label: "Contact", icon: Mail },
   ];
 
   const userNavigationItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: User },
-    { path: '/homework-help', label: 'Homework Help', icon: BookOpen },
-    { path: '/models', label: 'AI Models', icon: Brain },
-    { path: '/resources', label: 'Resources', icon: BookOpen },
-    { path: '/events', label: 'Events', icon: Calendar },
-    { path: '/contact', label: 'Contact', icon: Mail },
+    { path: "/dashboard", label: "Dashboard", icon: User },
+    { path: "/homework-help", label: "Homework Help", icon: BookOpen },
+    { path: "/models", label: "AI Models", icon: Brain },
+    { path: "/resources", label: "Resources", icon: BookOpen },
+    { path: "/events", label: "Events", icon: Calendar },
+    { path: "/contact", label: "Contact", icon: Mail },
   ];
 
   // Handle scroll effect
@@ -36,8 +47,8 @@ const Navigation: React.FC = () => {
       setIsScrolled(window.scrollY > 10);
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   // Close mobile menu when route changes
@@ -47,20 +58,22 @@ const Navigation: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch("/api/auth/logout", { method: "POST" });
       logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
   return (
-    <nav className={cn(
-      "sticky top-0 z-50 transition-all duration-300",
-      isScrolled 
-        ? "bg-white/95 backdrop-blur-md shadow-xl border-b border-white/20" 
-        : "bg-white/90 backdrop-blur-sm shadow-lg border-b border-white/20"
-    )}>
+    <nav
+      className={cn(
+        "sticky top-0 z-50 transition-all duration-300",
+        isScrolled
+          ? "bg-white/95 backdrop-blur-md shadow-xl border-b border-white/20"
+          : "bg-white/90 backdrop-blur-sm shadow-lg border-b border-white/20"
+      )}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -78,7 +91,7 @@ const Navigation: React.FC = () => {
             {(user ? userNavigationItems : navigationItems).map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
-              
+
               return (
                 <Link
                   key={item.path}
@@ -101,17 +114,19 @@ const Navigation: React.FC = () => {
           <div className="hidden md:flex items-center space-x-4">
             {user ? (
               <>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="hover:bg-white/60 hover:backdrop-blur-sm transition-all duration-300"
-                >
-                  <User className="h-4 w-4 mr-2 text-blue-600" />
-                  {user.name}
-                </Button>
-                <Button 
+                <Link href="/profile">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="hover:bg-white/60 hover:backdrop-blur-sm transition-all duration-300"
+                  >
+                    <User className="h-4 w-4 mr-2 text-blue-600" />
+                    {user.name}
+                  </Button>
+                </Link>
+                <Button
                   variant="outline"
-                  size="sm" 
+                  size="sm"
                   onClick={handleLogout}
                   className="hover:scale-105 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all duration-300"
                 >
@@ -122,9 +137,9 @@ const Navigation: React.FC = () => {
             ) : (
               <>
                 <Link href="/auth/signin">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="hover:bg-white/60 hover:backdrop-blur-sm transition-all duration-300"
                   >
                     <LogIn className="h-4 w-4 mr-2 text-blue-600" />
@@ -132,8 +147,8 @@ const Navigation: React.FC = () => {
                   </Button>
                 </Link>
                 <Link href="/auth/register">
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300"
                   >
                     <User className="h-4 w-4 mr-2" />
@@ -162,17 +177,19 @@ const Navigation: React.FC = () => {
         </div>
 
         {/* Mobile Navigation */}
-        <div className={cn(
-          "md:hidden border-t border-gray-200 transition-all duration-300 ease-in-out",
-          isMobileMenuOpen 
-            ? "max-h-96 opacity-100" 
-            : "max-h-0 opacity-0 overflow-hidden"
-        )}>
+        <div
+          className={cn(
+            "md:hidden border-t border-gray-200 transition-all duration-300 ease-in-out",
+            isMobileMenuOpen
+              ? "max-h-96 opacity-100"
+              : "max-h-0 opacity-0 overflow-hidden"
+          )}
+        >
           <div className="px-2 pt-2 pb-3 space-y-1">
             {(user ? userNavigationItems : navigationItems).map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
-              
+
               return (
                 <Link
                   key={item.path}
@@ -189,22 +206,22 @@ const Navigation: React.FC = () => {
                 </Link>
               );
             })}
-            
+
             {/* Mobile Auth Buttons */}
             <div className="pt-4 border-t border-gray-200 space-y-2">
               {user ? (
                 <>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="w-full justify-start hover:bg-gray-100"
                   >
                     <User className="h-4 w-4 mr-2" />
                     {user.name}
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
-                    size="sm" 
+                    size="sm"
                     onClick={handleLogout}
                     className="w-full justify-start hover:scale-105 transition-transform duration-200"
                   >
@@ -215,9 +232,9 @@ const Navigation: React.FC = () => {
               ) : (
                 <>
                   <Link href="/auth/signin" className="w-full">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="w-full justify-start hover:bg-gray-100"
                     >
                       <LogIn className="h-4 w-4 mr-2" />
@@ -225,8 +242,8 @@ const Navigation: React.FC = () => {
                     </Button>
                   </Link>
                   <Link href="/auth/register" className="w-full">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="w-full justify-start hover:scale-105 transition-transform duration-200"
                     >
                       <User className="h-4 w-4 mr-2" />

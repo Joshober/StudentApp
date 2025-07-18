@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{\"app\\\\homework-help\\\\page.tsx -> @/components/AISettingsPanel\":{\"id\":\"app\\\\homework-help\\\\page.tsx -> @/components/AISettingsPanel\",\"files\":[\"static/chunks/_app-pages-browser_src_components_AISettingsPanel_tsx.js\"]}}"
+self.__REACT_LOADABLE_MANIFEST="{\"app/homework-help/page.tsx -> @/components/AISettingsPanel\":{\"id\":\"app/homework-help/page.tsx -> @/components/AISettingsPanel\",\"files\":[\"static/chunks/_app-pages-browser_src_components_AISettingsPanel_tsx.js\"]}}"
