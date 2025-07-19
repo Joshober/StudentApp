@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getUserApiKey } from '@/lib/database';
+import { UserService } from '@/lib/database';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -13,7 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const userApiKey = getUserApiKey(parseInt(userId));
+    const userService = new UserService();
+    const userApiKey = userService.getUserApiKey(parseInt(userId));
     const envApiKey = process.env.OPENROUTER_API_KEY;
     
     let source: 'environment' | 'user' | 'none' = 'none';

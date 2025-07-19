@@ -28,87 +28,75 @@ ${settings.includeExamples ? 'Include relevant examples to illustrate your point
   return context;
 };
 
-// OpenRouter API implementation with fallback models
+// OpenRouter API implementation
 export const callOpenRouter = async (
   prompt: string, 
   files: string[], 
   settings: AISettings,
   userId?: number
 ) => {
-  const modelsToTry = [settings.model, ...FALLBACK_MODELS];
-  
-  for (const model of modelsToTry) {
-    try {
-      // Always use the server API route
-      const context = createTeachingContext(settings, files);
-      const response = await fetch('/api/openrouter', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt,
-          model,
-          settings: { ...settings, context },
-          userId,
-        }),
-      });
+  try {
+    // Always use the server API route
+    const context = createTeachingContext(settings, files);
+    const response = await fetch('/api/openrouter', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        model: settings.model,
+        settings: { ...settings, context },
+        userId,
+      }),
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'OpenRouter API request failed';
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'OpenRouter API request failed';
+      let retryAfter = null;
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorJson.message || errorMessage;
+        retryAfter = errorJson.retryAfter;
         
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || errorJson.message || errorMessage;
-          
-          // Handle token limit error specifically
-          if (response.status === 403 && errorJson.error?.includes('Token limit exceeded')) {
-            throw new Error('You have used all your available tokens. Please contact support to get more tokens.');
-          }
-          
-          // Handle invalid model ID error - try next model
-          if (response.status === 400 && errorJson.error?.includes('not a valid model ID')) {
-            console.warn(`Model ${model} not available, trying next model...`);
-            continue; // Try next model
-          }
-        } catch (parseError) {
-          errorMessage = errorText || errorMessage;
+        // Handle specific error cases with better messaging
+        if (response.status === 429) {
+          const waitTime = retryAfter || 60;
+          throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
         }
         
-        // If it's not a model ID error, throw the error
-        if (!errorMessage.includes('not a valid model ID')) {
-          const finalErrorMessage = `${response.status}: ${errorMessage}`;
-          throw new Error(finalErrorMessage);
+        if (response.status === 401) {
+          throw new Error('Invalid API key. Please check your OpenRouter configuration.');
         }
-      } else {
-        // Success! Return the response
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || 'No response generated';
+        
+        if (response.status === 403 && errorJson.error?.includes('Token limit exceeded')) {
+          throw new Error('You have used all your available tokens. Please contact support to get more tokens.');
+        }
+        
+        // Handle model-specific errors
+        if (errorJson.model) {
+          errorMessage += ` (Model: ${errorJson.model})`;
+        }
+        
+      } catch (parseError) {
+        errorMessage = errorText || errorMessage;
       }
-    } catch (error) {
-      // If this is the last model to try, throw the error
-      if (model === modelsToTry[modelsToTry.length - 1]) {
-        console.error('Error calling OpenRouter:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        throw new Error(`Failed to get response from OpenRouter: ${errorMessage}`);
-      }
-      // Otherwise, continue to next model
-      console.warn(`Failed with model ${model}, trying next model...`);
+      
+      const finalErrorMessage = `${response.status}: ${errorMessage}`;
+      throw new Error(finalErrorMessage);
+    } else {
+      // Success! Return the response
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || 'No response generated';
     }
+  } catch (error) {
+    console.error('Error calling OpenRouter:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to get response from OpenRouter: ${errorMessage}`);
   }
-  
-  // If we get here, all models failed
-  throw new Error('All available models failed. Please try again later.');
 };
-
-// Fallback models if the selected model fails
-const FALLBACK_MODELS = [
-  'meta-llama/llama-3.2-3b-instruct:free',
-  'microsoft/phi-3-medium-128k-instruct:free',
-  'microsoft/phi-3-mini-128k-instruct:free',
-  'qwen/qwen-2-7b-instruct:free'
-];
 
 export const getAIResponse = async (
   provider: AIProvider, 

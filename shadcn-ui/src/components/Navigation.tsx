@@ -34,8 +34,7 @@ const Navigation: React.FC = () => {
 
   const userNavigationItems = [
     { path: "/dashboard", label: "Dashboard", icon: User },
-    { path: "/homework-help", label: "Homework Help", icon: BookOpen },
-    { path: "/models", label: "AI Models", icon: Brain },
+    { path: "/ai-assistant", label: "AI Assistant", icon: Brain },
     { path: "/resources", label: "Resources", icon: BookOpen },
     { path: "/events", label: "Events", icon: Calendar },
     { path: "/contact", label: "Contact", icon: Mail },

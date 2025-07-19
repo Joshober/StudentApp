@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getUserTotalTokenUsage, getRemainingTokens, hasTokensRemaining, getUserApiKey } from '@/lib/database';
+import { TokenService, UserService } from '@/lib/database';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -13,14 +13,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const totalUsed = getUserTotalTokenUsage(parseInt(userId));
-    const remaining = getRemainingTokens(parseInt(userId));
-    const hasTokens = hasTokensRemaining(parseInt(userId));
+    const tokenService = new TokenService();
+    const userService = new UserService();
+    
+    const userIdNum = parseInt(userId);
+    const totalUsed = tokenService.getUserTotalTokenUsage(userIdNum);
+    const remaining = tokenService.getRemainingTokens(userIdNum);
+    const hasTokens = tokenService.hasTokensRemaining(userIdNum);
 
     // Get API key to fetch OpenRouter credits
     let apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      const userApiKey = getUserApiKey(parseInt(userId));
+      const userApiKey = userService.getUserApiKey(userIdNum);
       if (userApiKey) {
         apiKey = userApiKey;
       }

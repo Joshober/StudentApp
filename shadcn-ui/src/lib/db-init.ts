@@ -1,26 +1,43 @@
-import { initializeDatabase, seedDatabase } from './database';
-import { validateConfig } from './config';
+import { initializeDatabase, seedDatabase, checkDatabaseHealth } from './database';
 
-export const initializeApp = () => {
+let isInitialized = false;
+
+export const ensureDatabaseInitialized = () => {
+  if (isInitialized) {
+    return;
+  }
+
   try {
-    // Validate environment configuration
-    validateConfig();
+    console.log('🔧 Initializing database...');
     
-    // Initialize database
+    // Initialize database with migrations
     initializeDatabase();
     
-    // Seed database with initial data
-    seedDatabase();
+    // Check database health
+    const isHealthy = checkDatabaseHealth();
+    if (!isHealthy) {
+      console.error('❌ Database health check failed');
+      return;
+    }
     
-    console.log('✅ Application initialized successfully');
+    console.log('✅ Database initialized successfully');
+    
+    // Seed database with initial data (only if needed)
+    try {
+      seedDatabase();
+      console.log('✅ Database seeded successfully');
+    } catch (error) {
+      console.log('ℹ️ Database already seeded or seeding failed:', error);
+    }
+    
+    isInitialized = true;
   } catch (error) {
-    console.error('❌ Failed to initialize application:', error);
+    console.error('❌ Database initialization failed:', error);
     throw error;
   }
 };
 
-// Export for use in middleware or API routes
-export { initializeDatabase, seedDatabase };
-
-// Don't auto-initialize during build time
-// Database will be initialized when the /api/init endpoint is called 
+// Auto-initialize on module load (for server-side only)
+if (typeof window === 'undefined') {
+  ensureDatabaseInitialized();
+} 

@@ -1,5 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getUserApiKey } from '@/lib/database';
+import { UserService } from '@/lib/database';
+
+// Server-side cache for models data
+const modelsCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+// Get cached models data
+const getCachedModels = (apiKey: string) => {
+  const cached = modelsCache.get(apiKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  return null;
+};
+
+// Set cached models data
+const setCachedModels = (apiKey: string, data: any) => {
+  modelsCache.set(apiKey, { data, timestamp: Date.now() });
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -13,7 +31,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   if (!apiKey && userId && typeof userId === 'string') {
     try {
-      const userApiKey = getUserApiKey(parseInt(userId));
+      const userService = new UserService();
+      const userApiKey = userService.getUserApiKey(parseInt(userId));
       if (userApiKey) {
         apiKey = userApiKey;
       }
@@ -27,16 +46,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Fetch models from OpenRouter
+    // Check cache first
+    const cachedData = getCachedModels(apiKey);
+    if (cachedData) {
+      console.log('Returning cached models data');
+      return res.status(200).json(cachedData);
+    }
+
+    // Fetch models from OpenRouter with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
     const modelsResponse = await fetch('https://openrouter.ai/api/v1/models', {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'HTTP-Referer': req.headers.origin || '',
         'X-Title': 'AI Homework Tutor',
       },
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!modelsResponse.ok) {
+      console.error('Models API response not ok:', modelsResponse.status, modelsResponse.statusText);
       return res.status(modelsResponse.status).json({ 
         error: 'Failed to fetch models from OpenRouter',
         details: await modelsResponse.text()
@@ -44,6 +77,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const modelsData = await modelsResponse.json();
+    
+    if (!modelsData.data || !Array.isArray(modelsData.data)) {
+      console.error('Invalid models data structure:', modelsData);
+      return res.status(500).json({ 
+        error: 'Invalid response format from OpenRouter',
+        details: 'Models data is not in expected format'
+      });
+    }
     
     // Filter for free models and add additional info
     const freeModels = modelsData.data
@@ -55,30 +96,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Check if model is available and not deprecated
         const isAvailable = model.status === 'active' && !model.deprecated;
         
-        return hasFreePricing && isAvailable;
+        // Additional safety checks
+        const hasValidId = model.id && typeof model.id === 'string';
+        const hasValidName = model.name && typeof model.name === 'string';
+        
+        return hasFreePricing && isAvailable && hasValidId && hasValidName;
       })
       .map((model: any) => ({
         id: model.id,
         name: model.name,
-        description: model.description,
-        context_length: model.context_length,
-        pricing: model.pricing,
-        architecture: model.architecture,
-        top_provider: model.top_provider,
-        tags: model.tags || []
+        description: model.description || 'No description available',
+        context_length: model.context_length || 0,
+        pricing: model.pricing || { prompt: '0', completion: '0' },
+        architecture: model.architecture || { modality: 'text', tokenizer: 'unknown' },
+        top_provider: model.top_provider || { is_moderated: false },
+        tags: Array.isArray(model.tags) ? model.tags : []
       }))
       .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-    // Fetch user's remaining tokens/credits
+    // Fetch user's remaining tokens/credits with timeout
     let userCredits = null;
     try {
+      const creditsController = new AbortController();
+      const creditsTimeoutId = setTimeout(() => creditsController.abort(), 5000); // 5 second timeout
+
       const creditsResponse = await fetch('https://openrouter.ai/api/v1/auth/key', {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': req.headers.origin || '',
           'X-Title': 'AI Homework Tutor',
         },
+        signal: creditsController.signal,
       });
+
+      clearTimeout(creditsTimeoutId);
 
       if (creditsResponse.ok) {
         const creditsData = await creditsResponse.json();
@@ -93,13 +144,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Don't fail the request if credits fetch fails
     }
 
-    res.status(200).json({
+    const responseData = {
       models: freeModels,
       userCredits,
       totalModels: freeModels.length
-    });
+    };
+
+    // Cache the response
+    setCachedModels(apiKey, responseData);
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('OpenRouter models API error:', error);
+    
+    // Handle timeout errors specifically
+    if (error instanceof Error && error.name === 'AbortError') {
+      return res.status(408).json({ 
+        error: 'Request timeout - OpenRouter is taking too long to respond',
+        details: 'Please try again in a moment'
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Failed to fetch models from OpenRouter', 
       details: error instanceof Error ? error.message : error 

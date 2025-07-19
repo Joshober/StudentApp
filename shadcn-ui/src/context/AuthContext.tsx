@@ -5,6 +5,8 @@ interface User {
   email: string;
   name: string;
   role: string;
+  openrouter_api_key?: string;
+  provider?: string;
 }
 
 interface AuthContextType {
@@ -15,6 +17,8 @@ interface AuthContextType {
   isLoading: boolean;
   redirectTo?: string;
   setRedirectTo: (path: string) => void;
+  validateSession: () => Promise<boolean>;
+  checkOAuthCookies: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,13 +36,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [redirectTo, setRedirectTo] = useState<string | undefined>(undefined);
 
+  // Check for OAuth cookies and integrate with localStorage
+  const checkOAuthCookies = () => {
+    if (typeof window === 'undefined') return;
+    
+    // Check if there's a user_data cookie from OAuth
+    const cookies = document.cookie.split(';');
+    const userDataCookie = cookies.find(cookie => cookie.trim().startsWith('user_data='));
+    
+    if (userDataCookie) {
+      try {
+        const userData = JSON.parse(decodeURIComponent(userDataCookie.split('=')[1]));
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Clear the cookie after reading it
+        document.cookie = 'user_data=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      } catch (error) {
+        console.error('Error parsing OAuth cookie:', error);
+      }
+    }
+  };
+
+  // Validate if stored user still exists in database
+  const validateSession = async (): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const response = await fetch(`/api/auth/validate-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!response.ok) {
+        // User no longer exists, clear session
+        logout();
+        return false;
+      }
+
+      const data = await response.json();
+      if (data.valid) {
+        // Update user data if needed
+        setUser(data.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        return true;
+      } else {
+        logout();
+        return false;
+      }
+    } catch (error) {
+      console.error('Session validation error:', error);
+      logout();
+      return false;
+    }
+  };
+
   useEffect(() => {
+    // Check for OAuth cookies first
+    checkOAuthCookies();
+    
     // Check for stored user session
     if (typeof window !== 'undefined') {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         try {
-          setUser(JSON.parse(storedUser));
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+          
+          // Validate the session in the background
+          validateSession().catch(error => {
+            console.error('Session validation failed:', error);
+            logout();
+          });
         } catch (error) {
           console.error('Error parsing stored user:', error);
           localStorage.removeItem('user');
@@ -50,25 +124,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string): Promise<void> => {
     try {
-      // In a real app, this would be an API call
-      // For now, we'll simulate authentication
       if (!email || !password) {
         throw new Error('Email and password are required');
       }
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      const mockUser = {
-        id: 1,
-        email,
-        name: email.split('@')[0],
-        role: 'student'
-      };
+      const data = await response.json();
 
-      setUser(mockUser);
+      if (!response.ok) {
+        throw new Error(data.error || 'Sign in failed');
+      }
+
+      setUser(data.user);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('user', JSON.stringify(data.user));
       }
     } catch (error) {
       console.error('Sign in error:', error);
@@ -78,7 +154,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, name: string, apiKey?: string): Promise<void> => {
     try {
-      // In a real app, this would be an API call
       if (!email || !password || !name) {
         throw new Error('All fields are required');
       }
@@ -87,19 +162,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Password must be at least 6 characters long');
       }
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          name, 
+          openrouterApiKey: apiKey 
+        }),
+      });
 
-      const mockUser = {
-        id: Date.now(),
-        email,
-        name,
-        role: 'student'
-      };
+      const data = await response.json();
 
-      setUser(mockUser);
+      if (!response.ok) {
+        throw new Error(data.error || 'Sign up failed');
+      }
+
+      setUser(data.user);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('user', JSON.stringify(data.user));
       }
     } catch (error) {
       console.error('Sign up error:', error);
@@ -115,7 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, signIn, signUp, logout, isLoading, redirectTo, setRedirectTo }}>
+    <AuthContext.Provider value={{ user, signIn, signUp, logout, isLoading, redirectTo, setRedirectTo, validateSession, checkOAuthCookies }}>
       {children}
     </AuthContext.Provider>
   );

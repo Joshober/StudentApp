@@ -4,19 +4,19 @@ import { OpenRouterModel } from '@/types';
 export const OPENROUTER_MODELS: OpenRouterModel[] = [
   // Free models
   {
-    id: 'deepseek-ai/deepseek-coder-6.7b-instruct:free',
-    name: 'DeepSeek Coder 6.7B (Free)',
-    pricing: { prompt: '0', completion: '0' },
-    context_length: 16384,
-    architecture: { modality: 'text', tokenizer: 'DeepSeek' },
-    top_provider: { is_moderated: false }
-  },
-  {
     id: 'microsoft/phi-3-medium-128k-instruct:free',
     name: 'Phi-3 Medium 128K Instruct (Free)',
     pricing: { prompt: '0', completion: '0' },
     context_length: 128000,
     architecture: { modality: 'text', tokenizer: 'Phi3' },
+    top_provider: { is_moderated: false }
+  },
+  {
+    id: 'deepseek-ai/deepseek-coder-6.7b-instruct:free',
+    name: 'DeepSeek Coder 6.7B (Free)',
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 16384,
+    architecture: { modality: 'text', tokenizer: 'DeepSeek' },
     top_provider: { is_moderated: false }
   },
   {
