@@ -554,14 +554,7 @@ const Events: React.FC = () => {
         </div>
       </div>
 
-      {/* Debug section - remove after testing */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
-          <p className="text-sm text-yellow-800">
-            Debug: isAdmin = {isAdmin.toString()}, currentUser = {currentUser ? JSON.stringify(currentUser) : 'null'}
-          </p>
-        </div>
-      </div>
+
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Admin Review Section */}
