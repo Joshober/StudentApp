@@ -1,5 +1,5 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { initializeDatabase, seedDatabase, checkDatabaseHealth } from '@/lib/database';
+import { NextApiRequest, NextApiResponse } from 'next';
+import { initializeDatabase, seedDatabase } from '@/lib/database';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -7,32 +7,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log('Initializing database...');
-    
-    // Initialize database with migrations
+    // Initialize database with all migrations
+    console.log('🔄 Initializing database...');
     initializeDatabase();
     
-    // Check database health
-    const isHealthy = checkDatabaseHealth();
-    if (!isHealthy) {
-      return res.status(500).json({ error: 'Database health check failed' });
-    }
-    
-    // Seed database with initial data
+    // Seed database with sample data
+    console.log('🌱 Seeding database...');
     seedDatabase();
     
-    console.log('Database initialization completed successfully');
-    
-    return res.status(200).json({
-      message: 'Database initialized successfully',
-      health: 'OK',
-      timestamp: new Date().toISOString()
+    res.status(200).json({
+      success: true,
+      message: 'Database initialized and seeded successfully'
     });
   } catch (error) {
-    console.error('Database initialization failed:', error);
-    return res.status(500).json({ 
-      error: 'Database initialization failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error initializing database:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to initialize database'
     });
   }
 } 

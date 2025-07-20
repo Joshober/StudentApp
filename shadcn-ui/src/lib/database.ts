@@ -113,6 +113,8 @@ const migrations: Migration[] = [
       rating REAL DEFAULT 0,
       thumbnail TEXT,
       link TEXT NOT NULL,
+      submitter_email TEXT,
+      submitter_name TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -202,6 +204,35 @@ const migrations: Migration[] = [
       
       db.exec(`
         CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
+      `);
+    }
+  },
+  {
+    version: 4,
+    name: 'Add submitter fields to resources table',
+    up: (db: Database) => {
+      // Add submitter_email and submitter_name columns to resources table
+      db.exec(`
+        ALTER TABLE resources ADD COLUMN submitter_email TEXT;
+      `);
+      
+      db.exec(`
+        ALTER TABLE resources ADD COLUMN submitter_name TEXT;
+      `);
+    }
+  },
+  {
+    version: 5,
+    name: 'Add approval status to resources table',
+    up: (db: Database) => {
+      // Add approval status column to resources table
+      db.exec(`
+        ALTER TABLE resources ADD COLUMN is_approved BOOLEAN DEFAULT 1;
+      `);
+      
+      // Add admin role to users table
+      db.exec(`
+        ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0;
       `);
     }
   },
@@ -354,202 +385,173 @@ export const backupDatabase = (backupPath: string) => {
   }
 };
 
-// Seed data with better error handling
 export const seedDatabase = () => {
+  const db = getDatabase();
+  
   try {
-    const database = getDatabase();
+    // Check if resources table is empty
+    const resourceCount = db.prepare('SELECT COUNT(*) as count FROM resources').get() as { count: number };
     
-    // Check if data already exists
-    const existingResources = database.prepare('SELECT COUNT(*) as count FROM resources').get() as any;
-    if (existingResources.count > 0) {
-      console.log('Database already seeded, skipping...');
-      return;
+    if (resourceCount.count === 0) {
+      console.log('🌱 Seeding database with sample resources...');
+      
+      const sampleResources = [
+        {
+          title: 'React Fundamentals',
+          description: 'Learn the basics of React including components, props, state, and hooks.',
+          level: 'beginner',
+          course: 'programming',
+          tags: JSON.stringify(['react', 'javascript', 'frontend', 'web-development']),
+          type: 'course',
+          duration: '8 hours',
+          author: 'React Team',
+          rating: 4.8,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://react.dev/learn',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin',
+          is_approved: 1
+        },
+        {
+          title: 'Advanced TypeScript Patterns',
+          description: 'Master advanced TypeScript patterns including generics, decorators, and utility types.',
+          level: 'advanced',
+          course: 'programming',
+          tags: JSON.stringify(['typescript', 'javascript', 'advanced', 'patterns']),
+          type: 'tutorial',
+          duration: '6 hours',
+          author: 'TypeScript Team',
+          rating: 4.9,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://www.typescriptlang.org/docs/',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin',
+          is_approved: 1
+        },
+        {
+          title: 'UI/UX Design Principles',
+          description: 'Comprehensive guide to modern UI/UX design principles and best practices.',
+          level: 'intermediate',
+          course: 'design',
+          tags: JSON.stringify(['ui', 'ux', 'design', 'user-experience']),
+          type: 'course',
+          duration: '10 hours',
+          author: 'Design Academy',
+          rating: 4.7,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://www.interaction-design.org/',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin'
+        },
+        {
+          title: 'Data Science with Python',
+          description: 'Introduction to data science using Python, pandas, numpy, and matplotlib.',
+          level: 'beginner',
+          course: 'data-science',
+          tags: JSON.stringify(['python', 'data-science', 'pandas', 'numpy']),
+          type: 'course',
+          duration: '12 hours',
+          author: 'Data Science Institute',
+          rating: 4.6,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://www.datacamp.com/courses/intro-to-python-for-data-science',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin'
+        },
+        {
+          title: 'Digital Marketing Strategy',
+          description: 'Learn modern digital marketing strategies including SEO, social media, and content marketing.',
+          level: 'intermediate',
+          course: 'marketing',
+          tags: JSON.stringify(['marketing', 'seo', 'social-media', 'content']),
+          type: 'course',
+          duration: '8 hours',
+          author: 'Marketing Pro',
+          rating: 4.5,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://www.coursera.org/learn/digital-marketing',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin'
+        },
+        {
+          title: 'Business Analytics Tools',
+          description: 'Essential tools and techniques for business analytics and data-driven decision making.',
+          level: 'intermediate',
+          course: 'business',
+          tags: JSON.stringify(['analytics', 'business', 'excel', 'power-bi']),
+          type: 'tool',
+          duration: '6 hours',
+          author: 'Business Analytics Pro',
+          rating: 4.4,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://www.tableau.com/learn/training',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin'
+        },
+        {
+          title: 'Node.js Backend Development',
+          description: 'Build scalable backend applications with Node.js, Express, and MongoDB.',
+          level: 'intermediate',
+          course: 'programming',
+          tags: JSON.stringify(['nodejs', 'express', 'mongodb', 'backend']),
+          type: 'tutorial',
+          duration: '10 hours',
+          author: 'Node.js Community',
+          rating: 4.8,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://nodejs.org/en/learn/getting-started/introduction-to-nodejs',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin'
+        },
+        {
+          title: 'Machine Learning Fundamentals',
+          description: 'Introduction to machine learning algorithms and their applications.',
+          level: 'advanced',
+          course: 'data-science',
+          tags: JSON.stringify(['machine-learning', 'ai', 'python', 'scikit-learn']),
+          type: 'course',
+          duration: '15 hours',
+          author: 'ML Academy',
+          rating: 4.9,
+          thumbnail: '/api/placeholder/300/200',
+          link: 'https://www.coursera.org/learn/machine-learning',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin'
+        }
+      ];
+
+              const insertStmt = db.prepare(`
+          INSERT INTO resources (
+            title, description, level, course, tags, type, duration, 
+            author, rating, thumbnail, link, submitter_email, submitter_name, is_approved
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+      // Insert resources
+              for (const resource of sampleResources) {
+          insertStmt.run(
+            resource.title,
+            resource.description,
+            resource.level,
+            resource.course,
+            resource.tags,
+            resource.type,
+            resource.duration,
+            resource.author,
+            resource.rating,
+            resource.thumbnail,
+            resource.link,
+            resource.submitter_email,
+            resource.submitter_name,
+            resource.is_approved
+          );
+        }
+      console.log(`✅ Seeded database with ${sampleResources.length} sample resources`);
+    } else {
+      console.log('📊 Database already contains resources, skipping seed');
     }
-
-  const resourcesData = [
-    {
-      title: 'React Fundamentals for Beginners',
-      description: 'Learn the basics of React including components, props, and state management.',
-      level: 'beginner',
-      course: 'programming',
-      tags: JSON.stringify(['React', 'JavaScript', 'Frontend']),
-      type: 'course',
-      duration: '4 hours',
-      author: 'John Doe',
-      rating: 4.8,
-      thumbnail: '/api/placeholder/300/200',
-      link: '#'
-    },
-    {
-      title: 'Advanced TypeScript Patterns',
-      description: 'Master advanced TypeScript patterns and best practices for enterprise applications.',
-      level: 'advanced',
-      course: 'programming',
-      tags: JSON.stringify(['TypeScript', 'Patterns', 'Enterprise']),
-      type: 'tutorial',
-      duration: '2 hours',
-      author: 'Jane Smith',
-      rating: 4.9,
-      thumbnail: '/api/placeholder/300/200',
-      link: '#'
-    },
-    {
-      title: 'UI/UX Design Principles',
-      description: 'Essential design principles for creating user-friendly interfaces.',
-      level: 'intermediate',
-      course: 'design',
-      tags: JSON.stringify(['UI/UX', 'Design', 'Principles']),
-      type: 'article',
-      duration: '1 hour',
-      author: 'Mike Johnson',
-      rating: 4.7,
-      thumbnail: '/api/placeholder/300/200',
-      link: '#'
-    },
-    {
-      title: 'Business Strategy Fundamentals',
-      description: 'Learn the core concepts of business strategy and competitive analysis.',
-      level: 'beginner',
-      course: 'business',
-      tags: JSON.stringify(['Strategy', 'Business', 'Analysis']),
-      type: 'course',
-      duration: '6 hours',
-      author: 'Sarah Wilson',
-      rating: 4.6,
-      thumbnail: '/api/placeholder/300/200',
-      link: '#'
-    },
-    {
-      title: 'Data Science with Python',
-      description: 'Complete guide to data science using Python, pandas, and machine learning.',
-      level: 'intermediate',
-      course: 'data-science',
-      tags: JSON.stringify(['Python', 'Data Science', 'ML']),
-      type: 'course',
-      duration: '8 hours',
-      author: 'David Lee',
-      rating: 4.8,
-      thumbnail: '/api/placeholder/300/200',
-      link: '#'
-    },
-    {
-      title: 'Digital Marketing Essentials',
-      description: 'Master the fundamentals of digital marketing and social media strategy.',
-      level: 'beginner',
-      course: 'marketing',
-      tags: JSON.stringify(['Marketing', 'Digital', 'Social Media']),
-      type: 'tutorial',
-      duration: '3 hours',
-      author: 'Emily Chen',
-      rating: 4.5,
-      thumbnail: '/api/placeholder/300/200',
-      link: '#'
-    }
-  ];
-
-  const eventsData = [
-    {
-      title: 'React Advanced Patterns Workshop',
-      description: 'Deep dive into advanced React patterns including compound components, render props, and custom hooks.',
-      date: '2025-07-20',
-      time: '14:00',
-      location: 'Tech Hub, Room 201',
-      type: 'workshop',
-      capacity: 30,
-      registered: 22,
-        tags: JSON.stringify(['React', 'Advanced', 'Workshop']),
-        speaker: 'Dr. Sarah Johnson',
-      image: '/api/placeholder/400/250'
-    },
-    {
-        title: 'AI in Education Seminar',
-        description: 'Exploring the future of AI in education and how it can enhance learning experiences.',
-      date: '2025-07-25',
-        time: '10:00',
-      location: 'Main Auditorium',
-      type: 'seminar',
-        capacity: 100,
-        registered: 78,
-        tags: JSON.stringify(['AI', 'Education', 'Future']),
-        speaker: 'Prof. Michael Chen',
-      image: '/api/placeholder/400/250'
-    },
-    {
-        title: 'Student Networking Event',
-        description: 'Connect with fellow students, alumni, and industry professionals in a relaxed networking environment.',
-        date: '2025-08-01',
-        time: '18:00',
-        location: 'Student Center',
-      type: 'networking',
-        capacity: 50,
-        registered: 35,
-        tags: JSON.stringify(['Networking', 'Students', 'Alumni']),
-        speaker: 'Career Services Team',
-      image: '/api/placeholder/400/250'
-    },
-    {
-        title: 'Web Development Best Practices',
-        description: 'Learn modern web development best practices, performance optimization, and security considerations.',
-      date: '2025-08-05',
-        time: '15:30',
-        location: 'Online Webinar',
-      type: 'webinar',
-      capacity: 200,
-        registered: 156,
-        tags: JSON.stringify(['Web Development', 'Best Practices', 'Performance']),
-        speaker: 'Alex Rodriguez',
-      image: '/api/placeholder/400/250'
-    }
-  ];
-
-  // Insert resources
-    const insertResource = database.prepare(`
-      INSERT INTO resources (title, description, level, course, tags, type, duration, author, rating, thumbnail, link)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  resourcesData.forEach(resource => {
-    insertResource.run(
-      resource.title,
-      resource.description,
-      resource.level,
-      resource.course,
-      resource.tags,
-      resource.type,
-      resource.duration,
-      resource.author,
-      resource.rating,
-      resource.thumbnail,
-      resource.link
-    );
-  });
-
-  // Insert events
-    const insertEvent = database.prepare(`
-      INSERT INTO events (title, description, date, time, location, type, capacity, registered, tags, speaker, image)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  eventsData.forEach(event => {
-    insertEvent.run(
-      event.title,
-      event.description,
-      event.date,
-      event.time,
-      event.location,
-      event.type,
-      event.capacity,
-      event.registered,
-      event.tags,
-      event.speaker,
-      event.image
-    );
-  });
-
-  console.log('Database seeded successfully');
   } catch (error) {
-    console.error('Failed to seed database:', error);
-    throw error;
+    console.error('❌ Error seeding database:', error);
   }
 };
 
@@ -561,16 +563,16 @@ export class UserService {
     this.database = getDatabase();
   }
 
-  async createUser(email: string, password: string, name: string, openrouterApiKey?: string): Promise<number> {
+  async createUser(email: string, password: string, name: string, openrouterApiKey?: string, isAdmin?: boolean): Promise<number> {
     try {
   const hashedPassword = await bcrypt.hash(password, 10);
   
       const stmt = this.database.prepare(`
-    INSERT INTO users (email, password, name, openrouter_api_key)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (email, password, name, openrouter_api_key, is_admin)
+    VALUES (?, ?, ?, ?, ?)
   `);
   
-  const result = stmt.run(email, hashedPassword, name, openrouterApiKey || null);
+  const result = stmt.run(email, hashedPassword, name, openrouterApiKey || null, isAdmin ? 1 : 0);
       return result.lastInsertRowid as number;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -702,6 +704,28 @@ export class UserService {
     } catch (error) {
       console.error('Error getting user preferences:', error);
       return null;
+    }
+  }
+
+  isUserAdmin(userId: number): boolean {
+    try {
+      const stmt = this.database.prepare('SELECT is_admin FROM users WHERE id = ?');
+      const result = stmt.get(userId) as any;
+      return result?.is_admin === 1;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  }
+
+  isUserAdminByEmail(email: string): boolean {
+    try {
+      const stmt = this.database.prepare('SELECT is_admin FROM users WHERE email = ?');
+      const result = stmt.get(email) as any;
+      return result?.is_admin === 1;
+    } catch (error) {
+      console.error('Error checking admin status by email:', error);
+      return false;
     }
   }
 }
@@ -1197,6 +1221,264 @@ export class ModelSyncService {
     } catch (error) {
       console.error('Failed to get sync health:', error);
       return {};
+    }
+  }
+}
+
+export class ResourceService {
+  private database: Database;
+
+  constructor() {
+    this.database = getDatabase();
+  }
+
+  getAllResources(): any[] {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT * FROM resources 
+        ORDER BY rating DESC, created_at DESC
+      `);
+      return stmt.all();
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+      return [];
+    }
+  }
+
+  getResourcesByFilter(filters: {
+    type?: string;
+    level?: string;
+    course?: string;
+    search?: string;
+    userEmail?: string;
+    isAdmin?: boolean;
+    includePending?: boolean;
+  }): any[] {
+    try {
+      let query = 'SELECT * FROM resources WHERE 1=1';
+      const params: any[] = [];
+
+      // Filter by approval status
+      if (!filters.isAdmin && !filters.includePending) {
+        // Regular users only see approved resources
+        query += ' AND is_approved = 1';
+      } else if (filters.isAdmin && !filters.includePending) {
+        // Admins see approved resources by default
+        query += ' AND is_approved = 1';
+      } else if (filters.includePending) {
+        // Show pending resources for admins or resource owners
+        if (filters.isAdmin) {
+          // Admins see all pending resources
+          query += ' AND is_approved = 0';
+        } else if (filters.userEmail) {
+          // Users see their own pending resources
+          query += ' AND is_approved = 0 AND submitter_email = ?';
+          params.push(filters.userEmail);
+        }
+      }
+
+      if (filters.type && filters.type !== 'all') {
+        query += ' AND type = ?';
+        params.push(filters.type);
+      }
+
+      if (filters.level && filters.level !== 'all') {
+        query += ' AND level = ?';
+        params.push(filters.level);
+      }
+
+      if (filters.course && filters.course !== 'all') {
+        query += ' AND course = ?';
+        params.push(filters.course);
+      }
+
+      if (filters.search) {
+        query += ' AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)';
+        const searchTerm = `%${filters.search}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+      }
+
+      query += ' ORDER BY is_approved ASC, rating DESC, created_at DESC';
+
+      const stmt = this.database.prepare(query);
+      return stmt.all(...params);
+    } catch (error) {
+      console.error('Error fetching filtered resources:', error);
+      return [];
+    }
+  }
+
+  addResource(resource: {
+    title: string;
+    description: string;
+    level: 'beginner' | 'intermediate' | 'advanced';
+    course: string;
+    tags: string[];
+    type: 'video' | 'article' | 'tutorial' | 'course' | 'tool';
+    duration?: string;
+    author: string;
+    rating?: number;
+    thumbnail?: string;
+    link: string;
+    submitter_email?: string;
+    submitter_name?: string;
+    is_approved?: boolean;
+  }): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        INSERT INTO resources (title, description, level, course, tags, type, duration, author, rating, thumbnail, link, submitter_email, submitter_name, is_approved)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = stmt.run(
+        resource.title,
+        resource.description,
+        resource.level,
+        resource.course,
+        JSON.stringify(resource.tags),
+        resource.type,
+        resource.duration || '',
+        resource.author,
+        resource.rating || 0,
+        resource.thumbnail || '/api/placeholder/300/200',
+        resource.link,
+        resource.submitter_email || '',
+        resource.submitter_name || '',
+        resource.is_approved !== undefined ? (resource.is_approved ? 1 : 0) : 1
+      );
+
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error adding resource:', error);
+      return false;
+    }
+  }
+
+  getResourceById(id: number): any {
+    try {
+      const stmt = this.database.prepare('SELECT * FROM resources WHERE id = ?');
+      return stmt.get(id);
+    } catch (error) {
+      console.error('Error fetching resource by ID:', error);
+      return null;
+    }
+  }
+
+  updateResourceRating(id: number, rating: number): boolean {
+    try {
+      const stmt = this.database.prepare('UPDATE resources SET rating = ? WHERE id = ?');
+      const result = stmt.run(rating, id);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error updating resource rating:', error);
+      return false;
+    }
+  }
+
+  updateResource(id: number, resource: {
+    title: string;
+    description: string;
+    level: 'beginner' | 'intermediate' | 'advanced';
+    course: string;
+    tags: string[];
+    type: 'video' | 'article' | 'tutorial' | 'course' | 'tool';
+    duration?: string;
+    author: string;
+    link: string;
+  }): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        UPDATE resources 
+        SET title = ?, description = ?, level = ?, course = ?, tags = ?, 
+            type = ?, duration = ?, author = ?, link = ?
+        WHERE id = ?
+      `);
+
+      const result = stmt.run(
+        resource.title,
+        resource.description,
+        resource.level,
+        resource.course,
+        JSON.stringify(resource.tags),
+        resource.type,
+        resource.duration || '',
+        resource.author,
+        resource.link,
+        id
+      );
+
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error updating resource:', error);
+      return false;
+    }
+  }
+
+  deleteResource(id: number): boolean {
+    try {
+      const stmt = this.database.prepare('DELETE FROM resources WHERE id = ?');
+      const result = stmt.run(id);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error deleting resource:', error);
+      return false;
+    }
+  }
+
+  getResourceStats(): any {
+    try {
+      const stats = this.database.prepare(`
+        SELECT 
+          COUNT(*) as total_resources,
+          AVG(rating) as avg_rating,
+          COUNT(CASE WHEN level = 'beginner' THEN 1 END) as beginner_count,
+          COUNT(CASE WHEN level = 'intermediate' THEN 1 END) as intermediate_count,
+          COUNT(CASE WHEN level = 'advanced' THEN 1 END) as advanced_count,
+          COUNT(CASE WHEN is_approved = 1 THEN 1 END) as approved_count,
+          COUNT(CASE WHEN is_approved = 0 THEN 1 END) as pending_count
+        FROM resources
+      `).get();
+
+      return stats;
+    } catch (error) {
+      console.error('Error fetching resource stats:', error);
+      return {};
+    }
+  }
+
+  approveResource(id: number): boolean {
+    try {
+      const stmt = this.database.prepare('UPDATE resources SET is_approved = 1 WHERE id = ?');
+      const result = stmt.run(id);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error approving resource:', error);
+      return false;
+    }
+  }
+
+  rejectResource(id: number): boolean {
+    try {
+      const stmt = this.database.prepare('DELETE FROM resources WHERE id = ? AND is_approved = 0');
+      const result = stmt.run(id);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error rejecting resource:', error);
+      return false;
+    }
+  }
+
+  getPendingResources(): any[] {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT * FROM resources 
+        WHERE is_approved = 0 
+        ORDER BY created_at DESC
+      `);
+      return stmt.all();
+    } catch (error) {
+      console.error('Error fetching pending resources:', error);
+      return [];
     }
   }
 }
