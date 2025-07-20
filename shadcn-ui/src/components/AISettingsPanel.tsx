@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAISettings } from '@/context/AISettingsContext';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -26,21 +26,36 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Info, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Settings, Info, Loader2, Search, CheckCircle } from 'lucide-react';
 import { OPENROUTER_MODELS, getFreeModels, getPaidModels, formatModelPrice } from '@/lib/openrouter-models';
 
 const AISettingsPanel = () => {
   const { settings, updateSettings } = useAISettings();
+  
+  // Memoize the updateSettings function to prevent unnecessary re-renders
+  const handleModelSelect = useMemo(() => (modelId: string) => {
+    if (settings.model !== modelId) {
+      updateSettings({ model: modelId });
+    }
+  }, [settings.model, updateSettings]);
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [apiKeySource, setApiKeySource] = useState<'environment' | 'user' | null>(null);
   const [dynamicModels, setDynamicModels] = useState<any[]>([]);
+  const [filteredModels, setFilteredModels] = useState<any[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isLoadingApiKey, setIsLoadingApiKey] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   
   // Fallback to static models if dynamic fetch fails
-  const freeModels = dynamicModels.length > 0 ? dynamicModels : getFreeModels();
-  const paidModels = getPaidModels();
+  const freeModels = useMemo(() => 
+    dynamicModels.length > 0 ? dynamicModels : getFreeModels(), 
+    [dynamicModels]
+  );
+  const paidModels = useMemo(() => getPaidModels(), []);
+  const allModels = useMemo(() => [...freeModels, ...paidModels], [freeModels, paidModels]);
 
   // Check API key source and fetch models when user changes - with caching
   useEffect(() => {
@@ -54,6 +69,25 @@ const AISettingsPanel = () => {
       }
     }
   }, [user?.id]); // Only depend on user.id, not the entire user object
+
+  // Filter models based on search term
+  useEffect(() => {
+    if (!allModels.length || !open) return;
+    
+    const filtered = allModels.filter(model => 
+      model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      model.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      model.tags?.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+    setFilteredModels(filtered);
+  }, [searchTerm, allModels, open]);
+
+  // Reset search when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setSearchTerm('');
+    }
+  }, [open]);
 
   const checkApiKeySource = async () => {
     if (!user?.id || isLoadingApiKey) return;
@@ -77,7 +111,8 @@ const AISettingsPanel = () => {
     
     setIsLoadingModels(true);
     try {
-      const response = await fetch(`/api/openrouter/models?userId=${user.id}`);
+      // Use database models API instead of direct OpenRouter API
+      const response = await fetch(`/api/openrouter/db-models?userId=${user.id}`);
       if (response.ok) {
         const data = await response.json();
         // Deduplicate models by ID to prevent React key conflicts
@@ -87,7 +122,7 @@ const AISettingsPanel = () => {
         setDynamicModels(uniqueModels);
       }
     } catch (error) {
-      console.error('Failed to fetch dynamic models:', error);
+      console.error('Failed to fetch models from database:', error);
       // Fallback to static models
     } finally {
       setIsLoadingModels(false);
@@ -98,6 +133,15 @@ const AISettingsPanel = () => {
     setOpen(false);
   };
 
+  const formatContextLength = (length: number) => {
+    if (length >= 1000000) {
+      return `${(length / 1000000).toFixed(1)}M`;
+    } else if (length >= 1000) {
+      return `${(length / 1000).toFixed(0)}K`;
+    }
+    return length.toString();
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -106,7 +150,8 @@ const AISettingsPanel = () => {
           <span className="sr-only">Settings</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      {open && (
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>AI Tutor Settings</DialogTitle>
           <DialogDescription>
@@ -140,61 +185,118 @@ const AISettingsPanel = () => {
 
           <div className="grid gap-2">
             <Label htmlFor="model">AI Model Selection</Label>
-            <Select
-              value={settings.model}
-              onValueChange={(value) => updateSettings({ model: value })}
-            >
-              <SelectTrigger id="model">
-                <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                <SelectGroup>
-                  <div className="px-2 py-1.5 text-sm font-semibold text-green-600 flex items-center gap-2">
-                    <Info className="h-3 w-3" />
-                    Free Models (Recommended)
-                    {isLoadingModels && <Loader2 className="h-3 w-3 animate-spin" />}
-                  </div>
-                  {freeModels.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{model.name}</span>
-                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">
-                            FREE
-                          </Badge>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {model.context_length?.toLocaleString() || 'Unknown'} tokens context
-                        </span>
+            
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search models..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Model List */}
+            <ScrollArea className="h-64 border rounded-lg">
+              {isLoadingModels ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                </div>
+              ) : filteredModels.length > 0 ? (
+                <div className="p-2 space-y-2">
+                  {/* Free Models Section */}
+                  <div className="space-y-2">
+                    <div className="px-2 py-1.5 text-sm font-semibold text-green-600 flex items-center gap-2">
+                      <Info className="h-3 w-3" />
+                      Free Models (Recommended)
+                    </div>
+                    {filteredModels.filter(model => freeModels.some(fm => fm.id === model.id)).map((model) => (
+                      <div
+                        key={model.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-300 hover:bg-blue-50/50 ${
+                          settings.model === model.id 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200'
+                        }`}
+                                                 onClick={() => handleModelSelect(model.id)}
+                       >
+                         <div className="flex items-start justify-between">
+                           <div className="flex-1">
+                             <div className="flex items-center gap-2 mb-1">
+                               <h4 className="font-medium text-sm text-gray-900">{model.name}</h4>
+                               <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                                 FREE
+                               </Badge>
+                             </div>
+                             <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                               {model.description}
+                             </p>
+                             <div className="flex items-center gap-3 text-xs text-gray-500">
+                               <span>Context: {formatContextLength(model.context_length || 0)}</span>
+                             </div>
+                           </div>
+                           {settings.model === model.id && (
+                             <CheckCircle className="h-4 w-4 text-blue-600" />
+                           )}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+
+                   {/* Paid Models Section */}
+                   {filteredModels.filter(model => paidModels.some(pm => pm.id === model.id)).length > 0 && (
+                     <>
+                       <Separator className="my-2" />
+                       <div className="space-y-2">
+                         <div className="px-2 py-1.5 text-sm font-semibold text-blue-600 flex items-center gap-2">
+                           <Info className="h-3 w-3" />
+                           Premium Models (Paid)
+                         </div>
+                         {filteredModels.filter(model => paidModels.some(pm => pm.id === model.id)).slice(0, 5).map((model) => (
+                           <div
+                             key={model.id}
+                             className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-300 hover:bg-blue-50/50 ${
+                               settings.model === model.id 
+                                 ? 'border-blue-500 bg-blue-50' 
+                                 : 'border-gray-200'
+                             }`}
+                             onClick={() => handleModelSelect(model.id)}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-medium text-sm text-gray-900">{model.name}</h4>
+                                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                                    PAID
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                                  {model.description}
+                                </p>
+                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                  <span>Context: {formatContextLength(model.context_length || 0)}</span>
+                                  <span>{formatModelPrice(model)}</span>
+                                </div>
+                              </div>
+                              {settings.model === model.id && (
+                                <CheckCircle className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <Separator className="my-2" />
-                <SelectGroup>
-                  <div className="px-2 py-1.5 text-sm font-semibold text-blue-600 flex items-center gap-2">
-                    <Info className="h-3 w-3" />
-                    Premium Models (Paid)
-                  </div>
-                  {paidModels.slice(0, 5).map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{model.name}</span>
-                          <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
-                            PAID
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          <div>{formatModelPrice(model)}</div>
-                          <div>{model.context_length.toLocaleString()} tokens context</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  <Info className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p>No models found matching your search.</p>
+                </div>
+              )}
+            </ScrollArea>
+            
             <div className="text-xs text-muted-foreground mt-1">
               <Info className="h-3 w-3 inline mr-1" />
               Free models don't require payment. DeepSeek Coder is great for programming help!
@@ -281,6 +383,7 @@ const AISettingsPanel = () => {
           </Button>
         </DialogFooter>
       </DialogContent>
+      )}
     </Dialog>
   );
 };

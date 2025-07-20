@@ -1,35 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { UserService, TokenService } from '@/lib/database';
-
-// Simple in-memory rate limiting (for development)
-const requestCounts = new Map<string, { count: number; resetTime: number; lastRequest: number }>();
+import { UserService } from '@/lib/database';
+import { tokenManager } from '@/lib/token-service';
 
 // Cache for successful model responses to avoid redundant calls
 const modelResponseCache = new Map<string, { response: any; timestamp: number }>();
 const RESPONSE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-function isRateLimited(identifier: string): boolean {
-  const now = Date.now();
-  const userData = requestCounts.get(identifier);
-  
-  if (!userData || now > userData.resetTime) {
-    requestCounts.set(identifier, { 
-      count: 1, 
-      resetTime: now + 60000, // 1 minute window
-      lastRequest: now
-    });
-    return false;
-  }
-  
-  // More conservative rate limiting: 5 requests per minute
-  if (userData.count >= 5) {
-    return true;
-  }
-  
-  userData.count++;
-  userData.lastRequest = now;
-  return false;
-}
 
 // Fallback models that are known to work and have different rate limits
 const FALLBACK_MODELS = [
@@ -83,24 +58,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Enhanced rate limiting with better user feedback
   const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-  if (isRateLimited(userIP as string)) {
-    const userData = requestCounts.get(userIP as string);
-    const timeUntilReset = userData ? Math.ceil((userData.resetTime - Date.now()) / 1000) : 60;
-    
+  const rateLimitInfo = tokenManager.checkRateLimit(userIP as string, 10, 60000);
+  
+  if (rateLimitInfo.isRateLimited) {
     return res.status(429).json({ 
-      error: `Too many requests. Please wait ${timeUntilReset} seconds before trying again.`,
-      retryAfter: timeUntilReset
+      error: `Too many requests. Please wait ${rateLimitInfo.timeUntilReset} seconds before trying again.`,
+      retryAfter: rateLimitInfo.timeUntilReset,
+      requestsRemaining: rateLimitInfo.requestsRemaining
     });
   }
 
   // Check token limits if user is authenticated
   if (userId) {
-    const tokenService = new TokenService();
-    const hasTokens = tokenService.hasTokensRemaining(userId);
-    if (!hasTokens) {
+    const tokenStatus = tokenManager.checkTokenStatus(Number(userId));
+    if (!tokenStatus.hasTokens) {
       return res.status(403).json({ 
         error: 'Token limit exceeded. You have used all your available tokens.',
-        remainingTokens: 0
+        remainingTokens: 0,
+        totalUsed: tokenStatus.totalUsed,
+        limit: tokenStatus.limit
       });
     }
   }
@@ -122,9 +98,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Track token usage if user is authenticated
         if (userId && cached.response.usage) {
           try {
-            const tokenService = new TokenService();
-            tokenService.recordTokenUsage(
-              userId,
+            tokenManager.recordTokenUsage(
+              Number(userId),
               cached.response.usage.total_tokens || 0,
               currentModel,
               'homework_help'
@@ -211,9 +186,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       if (userId && data.usage) {
         try {
-          const tokenService = new TokenService();
-          tokenService.recordTokenUsage(
-            userId,
+          tokenManager.recordTokenUsage(
+            Number(userId),
             data.usage.total_tokens || 0,
             currentModel,
             'homework_help'
