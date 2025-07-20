@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, BookOpen, Video, FileText, Download, Star, Clock, Plus, X } from 'lucide-react';
+import { Search, Filter, BookOpen, Video, FileText, Download, Star, Clock, Plus, X, User, CheckCircle, XCircle, Loader2, AlertCircle, Crown, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,6 +30,7 @@ interface Resource {
   link: string;
   is_approved?: boolean;
   submitter_email?: string;
+  submitter_name?: string;
 }
 
 const typeColors = {
@@ -59,6 +61,7 @@ const Resources: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Form state for resource submission
@@ -72,16 +75,21 @@ const Resources: React.FC = () => {
     duration: '',
     author: '',
     link: '',
-    submitterNotes: ''
+    submitterNotes: '',
+    imageUrl: '',
+    imageFile: null as File | null
   });
 
   const fetchCurrentUser = async () => {
     try {
       const response = await fetch('/api/auth/current-user');
       const data = await response.json();
+      console.log('Current user data:', data); // Debug log
       if (data.success) {
         setCurrentUser(data.user);
-        setIsAdmin(data.user.role === 'admin' || data.user.is_admin);
+        const adminStatus = data.user.role === 'admin' || data.user.is_admin;
+        console.log('Admin status:', adminStatus); // Debug log
+        setIsAdmin(adminStatus);
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -128,10 +136,10 @@ const Resources: React.FC = () => {
   };
 
   const fetchPendingResources = async () => {
-    if (!isAdmin) return;
+    if (!currentUser?.email) return;
     
     try {
-      const response = await fetch(`/api/resources/pending?userEmail=${currentUser?.email}`);
+      const response = await fetch(`/api/resources/pending?userEmail=${currentUser.email}`);
       const data = await response.json();
 
       if (data.success) {
@@ -149,13 +157,15 @@ const Resources: React.FC = () => {
     fetchCurrentUser();
   }, []);
 
+  // Debug log for admin status
   useEffect(() => {
-    if (currentUser) {
-      fetchResources();
-      if (isAdmin) {
-        fetchPendingResources();
-      }
+    console.log('isAdmin state changed:', isAdmin);
+  }, [isAdmin]);
 
+  useEffect(() => {
+    fetchResources();
+    if (currentUser) {
+      fetchPendingResources();
     }
   }, [searchTerm, selectedType, selectedLevel, selectedSubject, currentUser, isAdmin, showPending]);
 
@@ -163,6 +173,32 @@ const Resources: React.FC = () => {
     e.preventDefault();
     
     try {
+      let imageUrl = submitForm.imageUrl;
+
+      // If a file is selected, upload it first
+      if (submitForm.imageFile) {
+        const formData = new FormData();
+        formData.append('image', submitForm.imageFile);
+
+        const uploadResponse = await fetch('/api/upload-image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const uploadData = await uploadResponse.json();
+
+        if (uploadData.success) {
+          imageUrl = uploadData.url;
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to upload image",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       const response = await fetch('/api/resources/submit', {
         method: 'POST',
         headers: {
@@ -170,6 +206,7 @@ const Resources: React.FC = () => {
         },
         body: JSON.stringify({
           ...submitForm,
+          thumbnail: imageUrl || '/api/placeholder/300/200',
           tags: submitForm.tags.split(',').map(tag => tag.trim())
         }),
       });
@@ -192,7 +229,9 @@ const Resources: React.FC = () => {
           duration: '',
           author: '',
           link: '',
-          submitterNotes: ''
+          submitterNotes: '',
+          imageUrl: '',
+          imageFile: null
         });
         fetchResources(); // Refresh the list
       } else {
@@ -213,6 +252,7 @@ const Resources: React.FC = () => {
   };
 
   const handleApproveResource = async (resourceId: number) => {
+    setProcessingId(resourceId);
     try {
       const response = await fetch('/api/resources/approve', {
         method: 'POST',
@@ -248,10 +288,13 @@ const Resources: React.FC = () => {
         description: "Failed to approve resource",
         variant: "destructive"
       });
+    } finally {
+      setProcessingId(null);
     }
   };
 
   const handleRejectResource = async (resourceId: number) => {
+    setProcessingId(resourceId);
     try {
       const response = await fetch('/api/resources/reject', {
         method: 'POST',
@@ -287,6 +330,8 @@ const Resources: React.FC = () => {
         description: "Failed to reject resource",
         variant: "destructive"
       });
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -458,6 +503,38 @@ const Resources: React.FC = () => {
                     />
                   </div>
 
+                  <div>
+                    <Label htmlFor="image">Resource Image</Label>
+                    <div className="space-y-2">
+                      <div>
+                        <Label htmlFor="imageUrl" className="text-sm text-gray-600">Image URL (optional)</Label>
+                        <Input
+                          id="imageUrl"
+                          type="url"
+                          value={submitForm.imageUrl}
+                          onChange={(e) => setSubmitForm({...submitForm, imageUrl: e.target.value})}
+                          placeholder="https://example.com/image.jpg"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">OR</span>
+                      </div>
+                      <div>
+                        <Label htmlFor="imageFile" className="text-sm text-gray-600">Upload Image (optional)</Label>
+                        <Input
+                          id="imageFile"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            setSubmitForm({...submitForm, imageFile: file || null});
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Max 5MB. Supported: JPG, PNG, GIF, WebP</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="submitterName">Your Name</Label>
@@ -498,6 +575,15 @@ const Resources: React.FC = () => {
               </DialogContent>
             </Dialog>
           </motion.div>
+        </div>
+      </div>
+
+      {/* Debug section - remove after testing */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            Debug: isAdmin = {isAdmin.toString()}, currentUser = {currentUser ? JSON.stringify(currentUser) : 'null'}
+          </p>
         </div>
       </div>
 
@@ -600,8 +686,192 @@ const Resources: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Admin Pending Resources Section */}
-        {isAdmin && pendingResources.length > 0 && (
+        {/* Admin Review Section */}
+        {isAdmin && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="mb-8"
+          >
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-100 p-2 rounded-lg">
+                    <Crown className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-amber-800">Admin Review</h2>
+                    <p className="text-amber-600">Review and approve pending resources</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                  {pendingResources.length} pending
+                </Badge>
+              </div>
+              
+              {pendingResources.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Pending Resources</h3>
+                  <p className="text-gray-600">All resources have been reviewed and processed.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingResources.map((resource) => (
+                    <Card key={resource.id} className="bg-white/80 backdrop-blur-sm border border-amber-200 shadow-sm">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg font-semibold text-gray-900 mb-2">
+                              {resource.title}
+                            </CardTitle>
+                            <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                              <div className="flex items-center gap-1">
+                                <User className="h-4 w-4" />
+                                {resource.author}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-4 w-4" />
+                                {resource.duration}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={typeColors[resource.type]}>
+                                {resource.type}
+                              </Badge>
+                              <Badge className={levelColors[resource.level]}>
+                                {resource.level}
+                              </Badge>
+                              <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                Pending Review
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="space-y-4">
+                        {/* Description */}
+                        <div>
+                          <h4 className="font-medium text-gray-900 mb-2">Description</h4>
+                          <p className="text-gray-700 leading-relaxed">{resource.description}</p>
+                        </div>
+
+                        {/* Resource Image */}
+                        {resource.thumbnail && resource.thumbnail !== '/api/placeholder/300/200' && (
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Resource Image</h4>
+                            <div className="relative w-full h-48 rounded-lg overflow-hidden border">
+                              <img
+                                src={resource.thumbnail}
+                                alt={resource.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Course and Tags */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Course/Subject</h4>
+                            <Badge variant="outline">{resource.course}</Badge>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Tags</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {resource.tags.map((tag) => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Submitter Info */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <h4 className="font-medium text-gray-900 mb-2">Submitted By</h4>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <User className="h-4 w-4" />
+                            <span>{resource.submitter_name || 'Unknown'}</span>
+                            <span>•</span>
+                            <span>{resource.submitter_email}</span>
+                          </div>
+                        </div>
+
+                        {/* Resource Link */}
+                        <div>
+                          <h4 className="font-medium text-gray-900 mb-2">Resource Link</h4>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={resource.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
+                            >
+                              {resource.link}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3">
+                          <Button
+                            onClick={() => handleApproveResource(resource.id)}
+                            disabled={processingId === resource.id}
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                          >
+                            {processingId === resource.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Approving...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Approve Resource
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={() => handleRejectResource(resource.id)}
+                            disabled={processingId === resource.id}
+                            variant="destructive"
+                            className="flex-1"
+                          >
+                            {processingId === resource.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Rejecting...
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Reject Resource
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Pending Resources Section */}
+        {pendingResources.length > 0 && !isAdmin && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -611,8 +881,12 @@ const Resources: React.FC = () => {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-yellow-800">Pending Resources</h2>
-                  <p className="text-yellow-600">Resources waiting for approval</p>
+                  <h2 className="text-2xl font-bold text-yellow-800">
+                    {isAdmin ? 'Pending Resources' : 'Your Pending Resources'}
+                  </h2>
+                  <p className="text-yellow-600">
+                    {isAdmin ? 'Resources waiting for approval' : 'Your submitted resources waiting for admin approval'}
+                  </p>
                 </div>
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                   {pendingResources.length} pending
@@ -651,23 +925,25 @@ const Resources: React.FC = () => {
                       </Badge>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleApproveResource(resource.id)}
-                        className="flex-1"
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleRejectResource(resource.id)}
-                        className="flex-1"
-                      >
-                        Reject
-                      </Button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveResource(resource.id)}
+                          className="flex-1"
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleRejectResource(resource.id)}
+                          className="flex-1"
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </div>
@@ -692,10 +968,23 @@ const Resources: React.FC = () => {
                 whileHover={{ y: -5, transition: { duration: 0.2 } }}
               >
                 <Card className="h-full hover:shadow-lg transition-all duration-300 border-0 shadow-md overflow-hidden">
-                  <div className="aspect-[2/1] bg-gradient-to-r from-blue-500 to-purple-600 relative">
-                    <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-                      <BookOpen className="h-12 w-12 text-white" />
-                    </div>
+                  <div className="aspect-[2/1] relative overflow-hidden">
+                    {resource.thumbnail && resource.thumbnail !== '/api/placeholder/300/200' ? (
+                      <img
+                        src={resource.thumbnail}
+                        alt={resource.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to placeholder if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.src = '/api/placeholder/300/200';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                        <BookOpen className="h-12 w-12 text-white" />
+                      </div>
+                    )}
                     <div className="absolute top-4 right-4 flex gap-2">
                       <Badge className={typeColors[resource.type]}>
                         {resource.type}

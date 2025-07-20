@@ -18,6 +18,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         includePending: includePending === 'true'
       };
 
+      // For non-authenticated users, show only approved resources
+      if (!userEmail) {
+        filters.isAdmin = false;
+        filters.includePending = false;
+      }
+
       const resources = resourceService.getResourcesByFilter(filters);
       
       res.status(200).json({

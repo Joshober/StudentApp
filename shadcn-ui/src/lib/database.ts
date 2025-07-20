@@ -134,6 +134,9 @@ const migrations: Migration[] = [
       tags TEXT NOT NULL,
       speaker TEXT,
       image TEXT,
+      submitter_email TEXT,
+      submitter_name TEXT,
+      is_approved INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -237,53 +240,36 @@ const migrations: Migration[] = [
     }
   },
   {
-    version: 4,
-    name: 'Add models and model sync tables',
+    version: 6,
+    name: 'Add events table with approval system',
     up: (db: Database) => {
-      // Models table to store OpenRouter models
+      // Create events table with approval system
       db.exec(`
-        CREATE TABLE IF NOT EXISTS models (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT,
-          context_length INTEGER DEFAULT 0,
-          pricing_prompt TEXT DEFAULT '0',
-          pricing_completion TEXT DEFAULT '0',
-          architecture_modality TEXT DEFAULT 'text',
-          architecture_tokenizer TEXT DEFAULT 'unknown',
-          top_provider_is_moderated BOOLEAN DEFAULT 0,
-          tags TEXT,
-          status TEXT DEFAULT 'active',
-          deprecated BOOLEAN DEFAULT 0,
-          is_free BOOLEAN DEFAULT 1,
-          last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      // Model sync log table to track sync operations
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS model_sync_log (
+        CREATE TABLE IF NOT EXISTS events (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          sync_type TEXT NOT NULL CHECK(sync_type IN ('full', 'incremental')),
-          models_fetched INTEGER DEFAULT 0,
-          models_updated INTEGER DEFAULT 0,
-          models_added INTEGER DEFAULT 0,
-          models_removed INTEGER DEFAULT 0,
-          sync_duration_ms INTEGER DEFAULT 0,
-          success BOOLEAN DEFAULT 1,
-          error_message TEXT,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          date TEXT NOT NULL,
+          time TEXT NOT NULL,
+          location TEXT NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('workshop', 'seminar', 'networking', 'webinar')),
+          capacity INTEGER NOT NULL,
+          registered INTEGER DEFAULT 0,
+          tags TEXT NOT NULL,
+          speaker TEXT,
+          image TEXT,
+          submitter_email TEXT,
+          submitter_name TEXT,
+          is_approved INTEGER DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
-
-      // Create indexes for better performance
+      
+      // Create indexes for events table
       db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_models_is_free ON models(is_free);
-        CREATE INDEX IF NOT EXISTS idx_models_status ON models(status);
-        CREATE INDEX IF NOT EXISTS idx_models_last_updated ON models(last_updated);
-        CREATE INDEX IF NOT EXISTS idx_model_sync_log_created_at ON model_sync_log(created_at);
-        CREATE INDEX IF NOT EXISTS idx_model_sync_log_success ON model_sync_log(success);
+        CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);
+        CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
+        CREATE INDEX IF NOT EXISTS idx_events_is_approved ON events(is_approved);
       `);
     }
   }
@@ -441,7 +427,8 @@ export const seedDatabase = () => {
           thumbnail: '/api/placeholder/300/200',
           link: 'https://www.interaction-design.org/',
           submitter_email: 'admin@example.com',
-          submitter_name: 'Admin'
+          submitter_name: 'Admin',
+          is_approved: 1
         },
         {
           title: 'Data Science with Python',
@@ -456,7 +443,8 @@ export const seedDatabase = () => {
           thumbnail: '/api/placeholder/300/200',
           link: 'https://www.datacamp.com/courses/intro-to-python-for-data-science',
           submitter_email: 'admin@example.com',
-          submitter_name: 'Admin'
+          submitter_name: 'Admin',
+          is_approved: 1
         },
         {
           title: 'Digital Marketing Strategy',
@@ -471,7 +459,8 @@ export const seedDatabase = () => {
           thumbnail: '/api/placeholder/300/200',
           link: 'https://www.coursera.org/learn/digital-marketing',
           submitter_email: 'admin@example.com',
-          submitter_name: 'Admin'
+          submitter_name: 'Admin',
+          is_approved: 1
         },
         {
           title: 'Business Analytics Tools',
@@ -486,7 +475,8 @@ export const seedDatabase = () => {
           thumbnail: '/api/placeholder/300/200',
           link: 'https://www.tableau.com/learn/training',
           submitter_email: 'admin@example.com',
-          submitter_name: 'Admin'
+          submitter_name: 'Admin',
+          is_approved: 1
         },
         {
           title: 'Node.js Backend Development',
@@ -501,7 +491,8 @@ export const seedDatabase = () => {
           thumbnail: '/api/placeholder/300/200',
           link: 'https://nodejs.org/en/learn/getting-started/introduction-to-nodejs',
           submitter_email: 'admin@example.com',
-          submitter_name: 'Admin'
+          submitter_name: 'Admin',
+          is_approved: 1
         },
         {
           title: 'Machine Learning Fundamentals',
@@ -516,7 +507,8 @@ export const seedDatabase = () => {
           thumbnail: '/api/placeholder/300/200',
           link: 'https://www.coursera.org/learn/machine-learning',
           submitter_email: 'admin@example.com',
-          submitter_name: 'Admin'
+          submitter_name: 'Admin',
+          is_approved: 1
         }
       ];
 
@@ -725,6 +717,17 @@ export class UserService {
       return result?.is_admin === 1;
     } catch (error) {
       console.error('Error checking admin status by email:', error);
+      return false;
+    }
+  }
+
+  updateUserAdminStatus(userId: number, isAdmin: boolean): boolean {
+    try {
+      const stmt = this.database.prepare('UPDATE users SET is_admin = ? WHERE id = ?');
+      const result = stmt.run(isAdmin ? 1 : 0, userId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error updating user admin status:', error);
       return false;
     }
   }
@@ -1478,6 +1481,251 @@ export class ResourceService {
       return stmt.all();
     } catch (error) {
       console.error('Error fetching pending resources:', error);
+      return [];
+    }
+  }
+
+  getPendingResourcesByUser(userEmail: string): any[] {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT * FROM resources 
+        WHERE is_approved = 0 AND submitter_email = ?
+        ORDER BY created_at DESC
+      `);
+      return stmt.all(userEmail);
+    } catch (error) {
+      console.error('Error fetching pending resources by user:', error);
+      return [];
+    }
+  }
+}
+
+export class EventService {
+  private database: Database;
+
+  constructor() {
+    this.database = getDatabase();
+  }
+
+  getAllEvents(): any[] {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT * FROM events 
+        ORDER BY date ASC, time ASC
+      `);
+      return stmt.all();
+    } catch (error) {
+      console.error('Error getting all events:', error);
+      return [];
+    }
+  }
+
+  getApprovedEvents(filters: {
+    type?: string;
+    userEmail?: string;
+    isAdmin?: boolean;
+  }): any[] {
+    try {
+      let query = `
+        SELECT e.*, u.name as submitter_name
+        FROM events e
+        LEFT JOIN users u ON e.submitter_email = u.email
+        WHERE e.is_approved = 1
+      `;
+      
+      const params: any[] = [];
+      
+      if (filters.type && filters.type !== 'all') {
+        query += ` AND e.type = ?`;
+        params.push(filters.type);
+      }
+      
+      query += ` ORDER BY e.date ASC, e.time ASC`;
+      
+      const stmt = this.database.prepare(query);
+      return stmt.all(...params);
+    } catch (error) {
+      console.error('Error getting approved events:', error);
+      return [];
+    }
+  }
+
+  addEvent(event: {
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    location: string;
+    type: 'workshop' | 'seminar' | 'networking' | 'webinar';
+    capacity: number;
+    tags: string[];
+    speaker?: string;
+    image?: string;
+    submitter_email?: string;
+    submitter_name?: string;
+    is_approved?: boolean;
+  }): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        INSERT INTO events (
+          title, description, date, time, location, type, 
+          capacity, tags, speaker, image, submitter_email, 
+          submitter_name, is_approved
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      const result = stmt.run(
+        event.title,
+        event.description,
+        event.date,
+        event.time,
+        event.location,
+        event.type,
+        event.capacity,
+        JSON.stringify(event.tags),
+        event.speaker || null,
+        event.image || null,
+        event.submitter_email || null,
+        event.submitter_name || null,
+        event.is_approved ? 1 : 0
+      );
+      
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error adding event:', error);
+      return false;
+    }
+  }
+
+  getEventById(id: string): any {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT e.*, u.name as submitter_name
+        FROM events e
+        LEFT JOIN users u ON e.submitter_email = u.email
+        WHERE e.id = ?
+      `);
+      return stmt.get(id);
+    } catch (error) {
+      console.error('Error getting event by id:', error);
+      return null;
+    }
+  }
+
+  updateEvent(id: string, event: {
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    location: string;
+    type: 'workshop' | 'seminar' | 'networking' | 'webinar';
+    capacity: number;
+    tags: string[];
+    speaker?: string;
+  }): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        UPDATE events SET
+          title = ?, description = ?, date = ?, time = ?, 
+          location = ?, type = ?, capacity = ?, tags = ?, speaker = ?
+        WHERE id = ?
+      `);
+      
+      const result = stmt.run(
+        event.title,
+        event.description,
+        event.date,
+        event.time,
+        event.location,
+        event.type,
+        event.capacity,
+        JSON.stringify(event.tags),
+        event.speaker || null,
+        id
+      );
+      
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error updating event:', error);
+      return false;
+    }
+  }
+
+  deleteEvent(id: string): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        DELETE FROM events WHERE id = ?
+      `);
+      
+      const result = stmt.run(id);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      return false;
+    }
+  }
+
+  approveEvent(id: string): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        UPDATE events SET is_approved = 1 WHERE id = ?
+      `);
+      
+      const result = stmt.run(id);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error approving event:', error);
+      return false;
+    }
+  }
+
+  rejectEvent(id: string): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        DELETE FROM events WHERE id = ?
+      `);
+      
+      const result = stmt.run(id);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error rejecting event:', error);
+      return false;
+    }
+  }
+
+  getPendingEvents(): any[] {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT e.*, u.name as submitter_name
+        FROM events e
+        LEFT JOIN users u ON e.submitter_email = u.email
+        WHERE e.is_approved IS NULL OR e.is_approved = 0
+        ORDER BY e.created_at DESC
+      `);
+      
+      return stmt.all();
+    } catch (error) {
+      console.error('Error getting pending events:', error);
+      return [];
+    }
+  }
+
+  getPendingEventsByUser(userEmail: string): any[] {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT e.*, u.name as submitter_name
+        FROM events e
+        LEFT JOIN users u ON e.submitter_email = u.email
+        WHERE (e.is_approved IS NULL OR e.is_approved = 0)
+        AND (e.submitter_email = ? OR EXISTS (
+          SELECT 1 FROM users WHERE email = ? AND is_admin = 1
+        ))
+        ORDER BY e.created_at DESC
+      `);
+      
+      return stmt.all(userEmail, userEmail);
+    } catch (error) {
+      console.error('Error getting pending events by user:', error);
       return [];
     }
   }

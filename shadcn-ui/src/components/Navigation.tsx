@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Brain,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const Navigation: React.FC = () => {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const navigationItems = [
     { path: "/", label: "Home", icon: Home },
@@ -40,6 +42,14 @@ const Navigation: React.FC = () => {
     { path: "/contact", label: "Contact", icon: Mail },
   ];
 
+  const adminNavigationItems = [
+    { path: "/dashboard", label: "Dashboard", icon: User },
+    { path: "/ai-assistant", label: "AI Assistant", icon: Brain },
+    { path: "/resources", label: "Resources", icon: BookOpen },
+    { path: "/events", label: "Events", icon: Calendar },
+    { path: "/contact", label: "Contact", icon: Mail },
+  ];
+
   // Handle scroll effect
   useEffect(() => {
     const handleScroll = () => {
@@ -49,6 +59,25 @@ const Navigation: React.FC = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user?.email) {
+        try {
+          const response = await fetch(`/api/user/admin-status?email=${user.email}`);
+          if (response.ok) {
+            const data = await response.json();
+            setIsAdmin(data.isAdmin);
+          }
+        } catch (error) {
+          console.error('Failed to check admin status:', error);
+        }
+      }
+    };
+
+    checkAdminStatus();
+  }, [user?.email]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -87,7 +116,7 @@ const Navigation: React.FC = () => {
 
           {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center space-x-8">
-            {(user ? userNavigationItems : navigationItems).map((item) => {
+            {(user ? (isAdmin ? adminNavigationItems : userNavigationItems) : navigationItems).map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
 
@@ -185,7 +214,7 @@ const Navigation: React.FC = () => {
           )}
         >
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {(user ? userNavigationItems : navigationItems).map((item) => {
+            {(user ? (isAdmin ? adminNavigationItems : userNavigationItems) : navigationItems).map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
 
