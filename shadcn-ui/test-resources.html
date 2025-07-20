@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resources API Test</title>
+</head>
+<body>
+    <h1>Resources API Test</h1>
+    <button onclick="testAPI()">Test Resources API</button>
+    <button onclick="resetResources()">Reset Resources</button>
+    <div id="output"></div>
+
+    <script>
+        async function testAPI() {
+            try {
+                const response = await fetch('/api/resources');
+                const data = await response.json();
+                document.getElementById('output').innerHTML = `
+                    <h3>API Response:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('output').innerHTML = `
+                    <h3>Error:</h3>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+
+        async function resetResources() {
+            try {
+                const response = await fetch('/api/debug/reset-resources', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                document.getElementById('output').innerHTML = `
+                    <h3>Reset Response:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('output').innerHTML = `
+                    <h3>Error:</h3>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+    </script>
+</body>
+</html> 

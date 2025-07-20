@@ -22,7 +22,8 @@ import {
   Copy,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
+  Crown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +35,8 @@ const ProfilePage: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [tokenUsage, setTokenUsage] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isUpdatingAdmin, setIsUpdatingAdmin] = useState(false);
 
   useEffect(() => {
     if (!user && !isLoading) {
@@ -44,8 +47,50 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (user?.id) {
       fetchTokenUsage();
+      checkAdminStatus();
     }
   }, [user?.id]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const response = await fetch(`/api/user/admin-status?email=${user?.email}`);
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdmin(data.isAdmin);
+      } else if (response.status === 404) {
+        // User not found in database, create them
+        await createUserInDatabase();
+      }
+    } catch (error) {
+      console.error('Failed to check admin status:', error);
+    }
+  };
+
+  const createUserInDatabase = async () => {
+    try {
+      const response = await fetch('/api/user/create-in-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: user?.email,
+          name: user?.name
+        }),
+      });
+
+      if (response.ok) {
+        // Retry checking admin status after creating user
+        const adminResponse = await fetch(`/api/user/admin-status?email=${user?.email}`);
+        if (adminResponse.ok) {
+          const data = await adminResponse.json();
+          setIsAdmin(data.isAdmin);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create user in database:', error);
+    }
+  };
 
   const fetchTokenUsage = async () => {
     try {
@@ -120,6 +165,53 @@ const ProfilePage: React.FC = () => {
     setTimeout(() => setMessage(null), 2000);
   };
 
+  const handleToggleAdmin = async () => {
+    if (!user?.email) return;
+
+    setIsUpdatingAdmin(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/user/toggle-admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: user.email,
+          isAdmin: !isAdmin
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setIsAdmin(!isAdmin);
+        setMessage({ 
+          type: 'success', 
+          text: data.message || `Successfully ${!isAdmin ? 'granted' : 'revoked'} admin privileges!` 
+        });
+        
+        // Refresh the page to update the user context
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: data.error || 'Failed to update admin status' 
+        });
+      }
+    } catch (error) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Failed to update admin status. Please check your internet connection and try again.' 
+      });
+    } finally {
+      setIsUpdatingAdmin(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -180,6 +272,68 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Admin Toggle Section */}
+        <div className="mb-6">
+          <Card className="bg-white/80 backdrop-blur-sm border border-white/50 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Crown className="h-5 w-5 text-amber-600" />
+                Admin Privileges
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-slate-800">Admin Status</h3>
+                  <p className="text-sm text-slate-600">
+                    {isAdmin 
+                      ? 'You have admin privileges. You can approve/reject resources and access admin features.' 
+                      : 'You are a regular user. Toggle to gain admin privileges for resource management.'
+                    }
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant={isAdmin ? "default" : "secondary"} className={isAdmin ? "bg-amber-100 text-amber-800" : ""}>
+                    {isAdmin ? 'Admin' : 'User'}
+                  </Badge>
+                  <Button
+                    onClick={handleToggleAdmin}
+                    disabled={isUpdatingAdmin}
+                    variant={isAdmin ? "destructive" : "default"}
+                    size="sm"
+                  >
+                    {isUpdatingAdmin ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Updating...
+                      </>
+                    ) : (
+                      isAdmin ? 'Remove Admin' : 'Make Admin'
+                    )}
+                  </Button>
+                </div>
+              </div>
+              
+              {isAdmin && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-medium mb-1">Admin Features Available:</p>
+                      <ul className="space-y-1 text-xs">
+                        <li>• Approve or reject pending resources</li>
+                        <li>• View all pending resources from all users</li>
+                        <li>• Access admin-only sections in the platform</li>
+                        <li>• Manage resource approval workflow</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

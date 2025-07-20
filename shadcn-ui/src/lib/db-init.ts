@@ -1,4 +1,4 @@
-import { initializeDatabase, getDatabase } from './database';
+import { initializeDatabase, getDatabase, seedDatabase } from './database';
 import fs from 'fs';
 import path from 'path';
 import { config } from './config';
@@ -24,7 +24,11 @@ export const forceReinitializeDatabase = () => {
     console.log('🏗️ Creating new database with all migrations...');
     initializeDatabase();
     
-    console.log('✅ Database reinitialized successfully!');
+    // Seed the database with sample data
+    console.log('🌱 Seeding database with sample data...');
+    seedDatabase();
+    
+    console.log('✅ Database reinitialized and seeded successfully!');
     return true;
   } catch (error) {
     console.error('❌ Failed to reinitialize database:', error);
@@ -32,7 +36,39 @@ export const forceReinitializeDatabase = () => {
   }
 };
 
+export const initializeDatabaseWithSeed = () => {
+  try {
+    console.log('🔄 Initializing database...');
+    initializeDatabase();
+    
+    console.log('🌱 Seeding database...');
+    seedDatabase();
+    
+    console.log('✅ Database initialized and seeded successfully!');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to initialize database:', error);
+    return false;
+  }
+};
+
+export const ensureDatabaseInitialized = () => {
+  try {
+    initializeDatabase();
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to ensure database initialization:', error);
+    return false;
+  }
+};
+
 // Run if this file is executed directly
 if (require.main === module) {
-  forceReinitializeDatabase();
+  const args = process.argv.slice(2);
+  
+  if (args.includes('--force')) {
+    forceReinitializeDatabase();
+  } else {
+    initializeDatabaseWithSeed();
+  }
 } 
