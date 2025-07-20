@@ -796,6 +796,53 @@ export class ModelService {
 
   constructor() {
     this.database = getDatabase();
+    this.ensureModelsTable();
+  }
+
+  private ensureModelsTable() {
+    try {
+      // Check if models table exists
+      const tableExists = this.database.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='models'
+      `).get();
+      
+      if (!tableExists) {
+        console.log('📋 Creating models table on demand...');
+        
+        // Create models table
+        this.database.exec(`
+          CREATE TABLE IF NOT EXISTS models (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            context_length INTEGER DEFAULT 0,
+            pricing_prompt TEXT DEFAULT '0',
+            pricing_completion TEXT DEFAULT '0',
+            architecture_modality TEXT DEFAULT 'text',
+            architecture_tokenizer TEXT DEFAULT 'unknown',
+            top_provider_is_moderated BOOLEAN DEFAULT 0,
+            tags TEXT,
+            status TEXT DEFAULT 'active',
+            deprecated BOOLEAN DEFAULT 0,
+            is_free BOOLEAN DEFAULT 1,
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        // Create indexes
+        this.database.exec(`
+          CREATE INDEX IF NOT EXISTS idx_models_is_free ON models(is_free);
+          CREATE INDEX IF NOT EXISTS idx_models_status ON models(status);
+          CREATE INDEX IF NOT EXISTS idx_models_last_updated ON models(last_updated);
+        `);
+        
+        console.log('✅ Models table created successfully');
+      }
+    } catch (error) {
+      console.error('❌ Failed to ensure models table:', error);
+    }
   }
 
   // Get all free models
@@ -951,6 +998,45 @@ export class ModelSyncService {
   constructor() {
     this.database = getDatabase();
     this.modelService = new ModelService();
+    this.ensureSyncLogTable();
+  }
+
+  private ensureSyncLogTable() {
+    try {
+      // Check if model_sync_log table exists
+      const tableExists = this.database.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='model_sync_log'
+      `).get();
+      
+      if (!tableExists) {
+        console.log('📋 Creating model_sync_log table on demand...');
+        
+        this.database.exec(`
+          CREATE TABLE IF NOT EXISTS model_sync_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sync_type TEXT NOT NULL CHECK(sync_type IN ('full', 'incremental')),
+            models_fetched INTEGER DEFAULT 0,
+            models_updated INTEGER DEFAULT 0,
+            models_added INTEGER DEFAULT 0,
+            models_removed INTEGER DEFAULT 0,
+            sync_duration_ms INTEGER DEFAULT 0,
+            success BOOLEAN DEFAULT 1,
+            error_message TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        this.database.exec(`
+          CREATE INDEX IF NOT EXISTS idx_model_sync_log_created_at ON model_sync_log(created_at);
+          CREATE INDEX IF NOT EXISTS idx_model_sync_log_success ON model_sync_log(success);
+        `);
+        
+        console.log('✅ Model sync log table created successfully');
+      }
+    } catch (error) {
+      console.error('❌ Failed to ensure sync log table:', error);
+    }
   }
 
   // Log sync operation

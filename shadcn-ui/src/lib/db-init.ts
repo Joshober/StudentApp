@@ -1,43 +1,38 @@
-import { initializeDatabase, seedDatabase, checkDatabaseHealth } from './database';
+import { initializeDatabase, getDatabase } from './database';
+import fs from 'fs';
+import path from 'path';
+import { config } from './config';
 
-let isInitialized = false;
-
-export const ensureDatabaseInitialized = () => {
-  if (isInitialized) {
-    return;
-  }
-
+export const forceReinitializeDatabase = () => {
   try {
-    console.log('🔧 Initializing database...');
+    console.log('🔄 Force reinitializing database...');
     
-    // Initialize database with migrations
+    // Delete existing database file
+    const dbPath = config.database.path;
+    if (fs.existsSync(dbPath)) {
+      console.log(`🗑️ Deleting existing database: ${dbPath}`);
+      try {
+        fs.unlinkSync(dbPath);
+        console.log('✅ Database file deleted successfully');
+      } catch (error) {
+        console.error('❌ Failed to delete database file:', error);
+        // Continue anyway, the database might be recreated
+      }
+    }
+    
+    // Reinitialize database with all migrations
+    console.log('🏗️ Creating new database with all migrations...');
     initializeDatabase();
     
-    // Check database health
-    const isHealthy = checkDatabaseHealth();
-    if (!isHealthy) {
-      console.error('❌ Database health check failed');
-      return;
-    }
-    
-    console.log('✅ Database initialized successfully');
-    
-    // Seed database with initial data (only if needed)
-    try {
-      seedDatabase();
-      console.log('✅ Database seeded successfully');
-    } catch (error) {
-      console.log('ℹ️ Database already seeded or seeding failed:', error);
-    }
-    
-    isInitialized = true;
+    console.log('✅ Database reinitialized successfully!');
+    return true;
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
-    throw error;
+    console.error('❌ Failed to reinitialize database:', error);
+    return false;
   }
 };
 
-// Auto-initialize on module load (for server-side only)
-if (typeof window === 'undefined') {
-  ensureDatabaseInitialized();
+// Run if this file is executed directly
+if (require.main === module) {
+  forceReinitializeDatabase();
 } 

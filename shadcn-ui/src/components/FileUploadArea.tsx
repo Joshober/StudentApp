@@ -147,7 +147,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
         return updated;
       });
 
-    } catch (error) {
+      } catch (error) {
       console.error('Error processing file:', error);
       setUploadedFiles(prev => 
         prev.map(f => 
@@ -160,7 +160,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
             : f
         )
       );
-    }
+      }
   };
 
   const processFileWithDocumentReader = async (file: File): Promise<DocumentContent> => {
@@ -183,7 +183,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
     }
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,
     accept: {
       'text/plain': ['.txt'],
@@ -226,8 +226,8 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
           
           {/* Drop Zone in Dialog */}
           <div className="space-y-4">
-            <div
-              {...getRootProps()}
+      <div
+        {...getRootProps()}
               className={cn(
                 'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
                 isDragActive 
@@ -235,19 +235,19 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
                   : 'border-gray-300 hover:border-gray-400',
                 disabled && 'opacity-50 cursor-not-allowed'
               )}
-            >
-              <input {...getInputProps()} />
+      >
+        <input {...getInputProps()} />
               <Upload className="h-8 w-8 mx-auto mb-3 text-gray-400" />
               <p className="text-sm text-gray-600 mb-2">
                 {isDragActive 
                   ? 'Drop files here...' 
                   : '📎 Upload documents to analyze with AI'
                 }
-              </p>
+          </p>
               <p className="text-xs text-gray-500">
                 Documents: PDF, DOC, DOCX • Text: TXT, MD, CSV, JSON, HTML (max 10MB each)
-              </p>
-            </div>
+          </p>
+      </div>
 
             {/* Security Notice */}
             <Alert className="bg-blue-50 border-blue-200">
@@ -256,7 +256,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
                 Files are processed securely. Scripts and dangerous content are automatically removed.
               </AlertDescription>
             </Alert>
-          </div>
+        </div>
         </DialogContent>
       </Dialog>
 

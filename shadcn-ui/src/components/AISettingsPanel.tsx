@@ -151,7 +151,7 @@ const AISettingsPanel = () => {
         </Button>
       </DialogTrigger>
       {open && (
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>AI Tutor Settings</DialogTitle>
           <DialogDescription>
@@ -207,10 +207,10 @@ const AISettingsPanel = () => {
                 <div className="p-2 space-y-2">
                   {/* Free Models Section */}
                   <div className="space-y-2">
-                    <div className="px-2 py-1.5 text-sm font-semibold text-green-600 flex items-center gap-2">
-                      <Info className="h-3 w-3" />
-                      Free Models (Recommended)
-                    </div>
+                  <div className="px-2 py-1.5 text-sm font-semibold text-green-600 flex items-center gap-2">
+                    <Info className="h-3 w-3" />
+                    Free Models (Recommended)
+                  </div>
                     {filteredModels.filter(model => freeModels.some(fm => fm.id === model.id)).map((model) => (
                       <div
                         key={model.id}
@@ -225,10 +225,10 @@ const AISettingsPanel = () => {
                            <div className="flex-1">
                              <div className="flex items-center gap-2 mb-1">
                                <h4 className="font-medium text-sm text-gray-900">{model.name}</h4>
-                               <Badge variant="outline" className="text-xs text-green-600 border-green-200">
-                                 FREE
-                               </Badge>
-                             </div>
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                            FREE
+                          </Badge>
+                        </div>
                              <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                                {model.description}
                              </p>
@@ -240,19 +240,19 @@ const AISettingsPanel = () => {
                              <CheckCircle className="h-4 w-4 text-blue-600" />
                            )}
                          </div>
-                       </div>
-                     ))}
+                      </div>
+                  ))}
                    </div>
 
                    {/* Paid Models Section */}
                    {filteredModels.filter(model => paidModels.some(pm => pm.id === model.id)).length > 0 && (
                      <>
-                       <Separator className="my-2" />
+                <Separator className="my-2" />
                        <div className="space-y-2">
-                         <div className="px-2 py-1.5 text-sm font-semibold text-blue-600 flex items-center gap-2">
-                           <Info className="h-3 w-3" />
-                           Premium Models (Paid)
-                         </div>
+                  <div className="px-2 py-1.5 text-sm font-semibold text-blue-600 flex items-center gap-2">
+                    <Info className="h-3 w-3" />
+                    Premium Models (Paid)
+                  </div>
                          {filteredModels.filter(model => paidModels.some(pm => pm.id === model.id)).slice(0, 5).map((model) => (
                            <div
                              key={model.id}
@@ -267,10 +267,10 @@ const AISettingsPanel = () => {
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <h4 className="font-medium text-sm text-gray-900">{model.name}</h4>
-                                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
-                                    PAID
-                                  </Badge>
-                                </div>
+                          <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                            PAID
+                          </Badge>
+                        </div>
                                 <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                                   {model.description}
                                 </p>
@@ -283,7 +283,7 @@ const AISettingsPanel = () => {
                                 <CheckCircle className="h-4 w-4 text-blue-600" />
                               )}
                             </div>
-                          </div>
+                        </div>
                         ))}
                       </div>
                     </>

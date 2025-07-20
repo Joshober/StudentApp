@@ -314,31 +314,35 @@ const getFileIcon = (fileName: string, className: string) => {
 };
 
 const AIAssistantPage: React.FC = () => {
-  const { user, isLoading } = useAuth();
-  const { settings } = useAISettings();
-  const { currentSession, addFileToCurrentSession, removeFileFromCurrentSession } = useStudySession();
   const router = useRouter();
+  const { user } = useAuth();
+  const { settings, updateSettings } = useAISettings();
+  const { currentSession, addFileToCurrentSession, removeFileFromCurrentSession } = useStudySession();
+  
+  const [activeTab, setActiveTab] = useState('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [showSpinner, setShowSpinner] = useState(false);
-  const [tokenStatus, setTokenStatus] = useState<{
-    totalUsed: number;
-    remaining: number;
-    hasTokens: boolean;
-    limit: number;
-    openRouterCredits?: {
-      remaining: number;
-      used: number;
-      total: number;
-    };
-  } | null>(null);
-  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('meta-llama/llama-3.2-3b-instruct:free');
-  const [aiUsageData, setAiUsageData] = useState<AIUsageData | null>(null);
-  const [isLoadingUsageData, setIsLoadingUsageData] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<DocumentContent[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [aiUsageData, setAiUsageData] = useState<AIUsageData | null>(null);
+  const [tokenStatus, setTokenStatus] = useState<any>(null);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
+  const [isLoadingUsageData, setIsLoadingUsageData] = useState(false);
+  const [showSpinner, setShowSpinner] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Use settings.model as selectedModel
+  const selectedModel = settings.model;
+  const setSelectedModel = (model: string) => {
+    updateSettings({ model });
+  };
+
+  // Handle model selection from models page
+  const handleModelSelection = (modelName: string) => {
+    setSelectedModel(modelName);
+    setActiveTab('chat');
+  };
 
   useEffect(() => {
     if (!user && !isLoading) {
@@ -360,9 +364,17 @@ const AIAssistantPage: React.FC = () => {
     }
   }, [user?.id]);
 
+  // Set loading to false when data is loaded
+  useEffect(() => {
+    if (user?.id && (aiUsageData || tokenStatus)) {
+      setIsLoading(false);
+    }
+  }, [user?.id, aiUsageData, tokenStatus]);
+
   const fetchInitialData = async () => {
     if (!user?.id) return;
     
+    setIsLoading(true);
     setIsLoadingTokens(true);
     
     try {
@@ -378,6 +390,7 @@ const AIAssistantPage: React.FC = () => {
   const fetchAIUsageData = async () => {
     if (!user?.id) return;
     
+    setIsLoading(true);
     setIsLoadingUsageData(true);
     try {
       const response = await fetch(`/api/user/ai-usage?userId=${user.id}`);
@@ -738,7 +751,7 @@ const AIAssistantPage: React.FC = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="chat" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="chat">Chat</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -1207,25 +1220,340 @@ const AIAssistantPage: React.FC = () => {
           {/* Models Tab */}
           <TabsContent value="models" className="space-y-6">
             {aiUsageData ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recommended Models</CardTitle>
-                  <p className="text-sm text-muted-foreground">Free models recommended for your usage</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {aiUsageData.models.recommended.map((model: any) => (
-                      <div key={model.id} className="p-4 border rounded-lg">
-                        <h4 className="font-medium">{model.name}</h4>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Context: {model.context_length.toLocaleString()} tokens
-                        </p>
-                        <Badge variant="outline" className="mt-2">Free</Badge>
+              <>
+                {/* Available Models List with Descriptions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-green-600" />
+                      Available Free Models
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {aiUsageData.models.available} models available for use - organized by best use cases
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Math & Science Models */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <h3 className="text-lg font-semibold text-slate-800">Math & Science</h3>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('meta-llama/llama-3.2-3b-instruct:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">Meta Llama 3.2 3B</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Excellent for step-by-step math problem solving, algebra, calculus, and physics equations.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">Step-by-step solutions</Badge>
+                            <Badge variant="secondary" className="text-xs">Algebra</Badge>
+                            <Badge variant="secondary" className="text-xs">Calculus</Badge>
+                            <Badge variant="secondary" className="text-xs">Physics</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 8K tokens</span>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('mistralai/mistral-7b-instruct:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">Mistral 7B Instruct</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Great for complex mathematical reasoning, statistics, and scientific explanations.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">Statistics</Badge>
+                            <Badge variant="secondary" className="text-xs">Scientific reasoning</Badge>
+                            <Badge variant="secondary" className="text-xs">Data analysis</Badge>
+                            <Badge variant="secondary" className="text-xs">Chemistry</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 32K tokens</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Programming & Coding Models */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                        <h3 className="text-lg font-semibold text-slate-800">Programming & Development</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('meta-llama/codellama-7b-instruct:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">CodeLlama 7B Instruct</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Specialized in code generation, debugging, and programming language explanations.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">Python</Badge>
+                            <Badge variant="secondary" className="text-xs">JavaScript</Badge>
+                            <Badge variant="secondary" className="text-xs">Code debugging</Badge>
+                            <Badge variant="secondary" className="text-xs">Algorithms</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 100K tokens</span>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl border border-purple-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('deepseek-ai/deepseek-coder-6.7b-instruct:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">DeepSeek Coder 6.7B</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Advanced code generation with multiple programming languages and software architecture.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">Web development</Badge>
+                            <Badge variant="secondary" className="text-xs">System design</Badge>
+                            <Badge variant="secondary" className="text-xs">Code review</Badge>
+                            <Badge variant="secondary" className="text-xs">Best practices</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 16K tokens</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Writing & Language Models */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                        <h3 className="text-lg font-semibold text-slate-800">Writing & Language</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border border-amber-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('meta-llama/llama-3.1-8b-instruct:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">Llama 3.1 8B</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Perfect for essay writing, creative writing, and language learning assistance.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">Essay writing</Badge>
+                            <Badge variant="secondary" className="text-xs">Creative writing</Badge>
+                            <Badge variant="secondary" className="text-xs">Grammar help</Badge>
+                            <Badge variant="secondary" className="text-xs">Language learning</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 8K tokens</span>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-br from-rose-50 to-pink-50 rounded-xl border border-rose-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('google/gemma-2-9b-it:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">Gemma 2 9B</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Great for academic writing, research papers, and formal document creation.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">Academic writing</Badge>
+                            <Badge variant="secondary" className="text-xs">Research papers</Badge>
+                            <Badge variant="secondary" className="text-xs">Citation help</Badge>
+                            <Badge variant="secondary" className="text-xs">Proofreading</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 8K tokens</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* General Purpose Models */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-slate-500 rounded-full"></div>
+                        <h3 className="text-lg font-semibold text-slate-800">General Purpose</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl border border-slate-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('mistralai/mistral-7b-instruct:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">Mistral 7B Instruct</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Versatile model good for general homework help, explanations, and study assistance.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">General help</Badge>
+                            <Badge variant="secondary" className="text-xs">Study guides</Badge>
+                            <Badge variant="secondary" className="text-xs">Explanations</Badge>
+                            <Badge variant="secondary" className="text-xs">Homework help</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 32K tokens</span>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-200 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleModelSelection('meta-llama/llama-3.1-8b-instruct:free')}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-800">Llama 3.1 8B</h4>
+                            <Badge variant="outline" className="text-xs">Free</Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Balanced model for various subjects, good conversation, and detailed responses.
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">Conversation</Badge>
+                            <Badge variant="secondary" className="text-xs">Detailed answers</Badge>
+                            <Badge variant="secondary" className="text-xs">Multiple subjects</Badge>
+                            <Badge variant="secondary" className="text-xs">Problem solving</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Context: 8K tokens</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* All Available Models */}
+                    <div className="space-y-3 pt-4 border-t border-gray-200">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                        <h3 className="text-lg font-semibold text-slate-800">Complete Model List</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {aiUsageData.models.recommended.map((model: any) => {
+                          // Determine model category and description based on model name
+                          const getModelInfo = (modelName: string) => {
+                            const name = modelName.toLowerCase();
+                            
+                            // Math & Science Models
+                            if (name.includes('llama') && (name.includes('3.2') || name.includes('3b'))) {
+                              return {
+                                category: 'Math & Science',
+                                description: 'Excellent for step-by-step math problem solving, algebra, calculus, and physics equations.',
+                                capabilities: ['Step-by-step solutions', 'Algebra', 'Calculus', 'Physics'],
+                                color: 'from-orange-50 to-amber-50',
+                                borderColor: 'border-orange-200'
+                              };
+                            }
+                            
+                            // Coding Models
+                            if (name.includes('code') || name.includes('coder') || name.includes('deepseek')) {
+                              return {
+                                category: 'Programming & Coding',
+                                description: 'Specialized in code generation, debugging, and programming language explanations.',
+                                capabilities: ['Python', 'JavaScript', 'Code debugging', 'Algorithms'],
+                                color: 'from-emerald-50 to-green-50',
+                                borderColor: 'border-emerald-200'
+                              };
+                            }
+                            
+                            if (name.includes('codellama')) {
+                              return {
+                                category: 'Programming & Coding',
+                                description: 'Advanced code generation with multiple programming languages and software architecture.',
+                                capabilities: ['Web development', 'System design', 'Code review', 'Best practices'],
+                                color: 'from-purple-50 to-violet-50',
+                                borderColor: 'border-purple-200'
+                              };
+                            }
+                            
+                            // Writing Models
+                            if (name.includes('gemma')) {
+                              return {
+                                category: 'Writing & Language',
+                                description: 'Great for academic writing, research papers, and formal document creation.',
+                                capabilities: ['Academic writing', 'Research papers', 'Citation help', 'Proofreading'],
+                                color: 'from-rose-50 to-pink-50',
+                                borderColor: 'border-rose-200'
+                              };
+                            }
+                            
+                            if (name.includes('llama') && name.includes('8b')) {
+                              return {
+                                category: 'Writing & Language',
+                                description: 'Perfect for essay writing, creative writing, and language learning assistance.',
+                                capabilities: ['Essay writing', 'Creative writing', 'Grammar help', 'Language learning'],
+                                color: 'from-amber-50 to-yellow-50',
+                                borderColor: 'border-amber-200'
+                              };
+                            }
+                            
+                            // Mistral Models
+                            if (name.includes('mistral')) {
+                              return {
+                                category: 'General Purpose',
+                                description: 'Versatile model good for general homework help, explanations, and study assistance.',
+                                capabilities: ['General help', 'Study guides', 'Explanations', 'Homework help'],
+                                color: 'from-slate-50 to-gray-50',
+                                borderColor: 'border-slate-200'
+                              };
+                            }
+                            
+                            // Default for unknown models
+                            return {
+                              category: 'General Purpose',
+                              description: 'Versatile AI model for various tasks and subjects.',
+                              capabilities: ['General help', 'Conversation', 'Problem solving', 'Multiple subjects'],
+                              color: 'from-indigo-50 to-blue-50',
+                              borderColor: 'border-indigo-200'
+                            };
+                          };
+                          
+                          const modelInfo = getModelInfo(model.name);
+                          
+                          return (
+                            <div 
+                              key={model.id} 
+                              className={`p-4 bg-gradient-to-br ${modelInfo.color} rounded-xl border ${modelInfo.borderColor} hover:shadow-md transition-shadow cursor-pointer`}
+                              onClick={() => handleModelSelection(model.id)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-medium text-slate-800">{model.name}</h4>
+                                <Badge variant="outline" className="text-xs">Free</Badge>
+                              </div>
+                              <p className="text-sm text-slate-600 mb-3">
+                                {modelInfo.description}
+                              </p>
+                              <div className="flex flex-wrap gap-1 mb-3">
+                                {modelInfo.capabilities.map((capability, index) => (
+                                  <Badge key={index} variant="secondary" className="text-xs">
+                                    {capability}
+                                  </Badge>
+                                ))}
+                              </div>
+                              <div className="flex items-center justify-between text-xs text-gray-500">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-3 w-3" />
+                                  <span>Context: {model.context_length.toLocaleString()} tokens</span>
+                                </div>
+                                <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                  {modelInfo.category}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             ) : (
               <Card>
                 <CardContent className="flex items-center justify-center py-8">
