@@ -1,26 +1,38 @@
-import { initializeDatabase, seedDatabase } from './database';
-import { validateConfig } from './config';
+import { initializeDatabase, getDatabase } from './database';
+import fs from 'fs';
+import path from 'path';
+import { config } from './config';
 
-export const initializeApp = () => {
+export const forceReinitializeDatabase = () => {
   try {
-    // Validate environment configuration
-    validateConfig();
+    console.log('🔄 Force reinitializing database...');
     
-    // Initialize database
+    // Delete existing database file
+    const dbPath = config.database.path;
+    if (fs.existsSync(dbPath)) {
+      console.log(`🗑️ Deleting existing database: ${dbPath}`);
+      try {
+        fs.unlinkSync(dbPath);
+        console.log('✅ Database file deleted successfully');
+      } catch (error) {
+        console.error('❌ Failed to delete database file:', error);
+        // Continue anyway, the database might be recreated
+      }
+    }
+    
+    // Reinitialize database with all migrations
+    console.log('🏗️ Creating new database with all migrations...');
     initializeDatabase();
     
-    // Seed database with initial data
-    seedDatabase();
-    
-    console.log('✅ Application initialized successfully');
+    console.log('✅ Database reinitialized successfully!');
+    return true;
   } catch (error) {
-    console.error('❌ Failed to initialize application:', error);
-    throw error;
+    console.error('❌ Failed to reinitialize database:', error);
+    return false;
   }
 };
 
-// Export for use in middleware or API routes
-export { initializeDatabase, seedDatabase };
-
-// Don't auto-initialize during build time
-// Database will be initialized when the /api/init endpoint is called 
+// Run if this file is executed directly
+if (require.main === module) {
+  forceReinitializeDatabase();
+} 

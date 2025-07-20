@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { UserService } from '@/lib/database';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -66,22 +67,49 @@ export async function GET(request: NextRequest) {
 
     const userData = await userResponse.json();
     
-    // In a real app, you would:
-    // 1. Check if user exists in your database
-    // 2. Create user if they don't exist
-    // 3. Create a session/token
-    // 4. Redirect to dashboard
+    // Integrate with our database system
+    const userService = new UserService();
+    
+    // Check if user exists by email
+    let user = userService.findUserByEmail(userData.email);
+    
+    if (!user) {
+      // Create new user with Google data
+      try {
+        const userId = await userService.createUser(
+          userData.email,
+          '', // No password for OAuth users
+          userData.name || userData.email.split('@')[0],
+          undefined // No API key initially
+        );
+        
+        user = userService.findUserByEmail(userData.email);
+        console.log('Created new user via Google OAuth:', userData.email);
+      } catch (error) {
+        console.error('Failed to create user via Google OAuth:', error);
+        return NextResponse.redirect(new URL('/auth/signin?error=user_creation_failed', request.url));
+      }
+    }
 
-    // For now, we'll redirect to the homepage with user data
-    const response = NextResponse.redirect(new URL('/', request.url));
+    if (!user) {
+      return NextResponse.redirect(new URL('/auth/signin?error=user_not_found', request.url));
+    }
+
+    // Create a secure session token
+    const sessionToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
     
     // Store user data in cookie (in production, use secure session management)
+    const response = NextResponse.redirect(new URL('/dashboard', request.url));
+    
+    // Store user data in cookie
     response.cookies.set('user_data', JSON.stringify({
-      id: userData.id,
-      email: userData.email,
-      name: userData.name,
-      picture: userData.picture,
-      provider: 'google'
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      openrouter_api_key: user.openrouter_api_key,
+      provider: 'google',
+      sessionToken: sessionToken
     }), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

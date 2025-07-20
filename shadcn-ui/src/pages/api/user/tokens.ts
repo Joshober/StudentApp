@@ -3,10 +3,6 @@ import { UserService } from '@/lib/database';
 import { tokenManager } from '@/lib/token-service';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   const { userId } = req.query;
 
   if (!userId || typeof userId !== 'string') {
@@ -15,11 +11,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const userService = new UserService();
-    
     const userIdNum = parseInt(userId);
+    
+    // Get comprehensive token information in one call
     const tokenStatus = tokenManager.checkTokenStatus(userIdNum);
-
-    // Get API key to fetch OpenRouter credits
+    const detailedUsage = tokenManager.getTokenUsageStats(userIdNum);
+    
+    // Calculate additional metrics
+    const totalRequests = detailedUsage.reduce((sum, item) => sum + (item.total_requests || 0), 0);
+    const averageTokensPerRequest = totalRequests > 0 ? tokenStatus.totalUsed / totalRequests : 0;
+    
+    // Get API key for OpenRouter credits
     let apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       const userApiKey = userService.getUserApiKey(userIdNum);
@@ -54,29 +56,57 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    res.status(200).json({
+    // Get cache statistics for debugging
+    const cacheStats = tokenManager.getCacheStats();
+
+    return res.status(200).json({
+      // Token status
       totalUsed: tokenStatus.totalUsed,
       remaining: tokenStatus.remainingTokens,
       hasTokens: tokenStatus.hasTokens,
       limit: tokenStatus.limit,
-      openRouterCredits
+      
+      // Usage statistics
+      totalRequests,
+      averageTokensPerRequest: Math.round(averageTokensPerRequest * 100) / 100,
+      detailedUsage,
+      
+      // OpenRouter credits
+      openRouterCredits,
+      
+      // Cache information (for debugging)
+      cacheStats,
+      
+      // Rate limit information
+      rateLimitInfo: {
+        maxRequests: 10,
+        windowMs: 60000
+      }
     });
   } catch (error) {
-    console.error('Error fetching token status:', error);
+    console.error('Error fetching comprehensive token data:', error);
     
     // If database table doesn't exist, return default values
     if (error instanceof Error && error.message.includes('no such table')) {
-      res.status(200).json({
+      return res.status(200).json({
         totalUsed: 0,
         remaining: 10000,
         hasTokens: true,
-        limit: 10000
+        limit: 10000,
+        totalRequests: 0,
+        averageTokensPerRequest: 0,
+        detailedUsage: [],
+        openRouterCredits: null,
+        cacheStats: { rateLimitEntries: 0, tokenCacheEntries: 0 },
+        rateLimitInfo: {
+          maxRequests: 10,
+          windowMs: 60000
+        }
       });
-      return;
     }
     
-    res.status(500).json({ 
-      error: 'Failed to fetch token status',
+    return res.status(500).json({ 
+      error: 'Failed to fetch token data',
       details: error instanceof Error ? error.message : error 
     });
   }

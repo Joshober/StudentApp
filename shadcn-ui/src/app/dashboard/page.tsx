@@ -139,7 +139,7 @@ const DashboardPage: React.FC = () => {
                   <Button 
                     variant="outline" 
                     className="w-full"
-                    onClick={() => window.location.href = '/homework-help'}
+                    onClick={() => window.location.href = '/ai-assistant'}
                     disabled={tokenStatus ? !tokenStatus.hasTokens : false}
                   >
                     <Zap className="h-4 w-4 mr-2" />
@@ -165,11 +165,11 @@ const DashboardPage: React.FC = () => {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"
-                  onClick={() => window.location.href = '/homework-help'}
+                  onClick={() => window.location.href = '/ai-assistant'}
                   disabled={tokenStatus ? !tokenStatus.hasTokens : false}
                 >
                   <Brain className="h-4 w-4 mr-2" />
-                  AI Homework Help
+                  AI Assistant
                 </Button>
                 <Button 
                   variant="outline" 
