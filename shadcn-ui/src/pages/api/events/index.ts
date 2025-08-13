@@ -9,13 +9,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { type, userEmail, isAdmin } = req.query;
+    const { type, userEmail, isAdmin, limit } = req.query;
 
     // Get approved events only
     const events = eventService.getApprovedEvents({
       type: type as string,
       userEmail: userEmail as string,
-      isAdmin: isAdmin === 'true'
+      isAdmin: isAdmin === 'true',
+      limit: limit ? parseInt(limit as string) : undefined
     });
 
     res.status(200).json({

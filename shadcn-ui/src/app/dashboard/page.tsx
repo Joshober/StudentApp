@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Navigation from '@/components/Navigation';
+import UpcomingEvents from '@/components/UpcomingEvents';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -93,7 +94,7 @@ const DashboardPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Token Status */}
           <Card className={`${tokenStatus && !tokenStatus.hasTokens ? 'bg-gradient-to-r from-red-500 to-pink-600' : 'bg-gradient-to-r from-green-500 to-emerald-600'} text-white`}>
             <CardContent className="p-6">
@@ -230,6 +231,47 @@ const DashboardPage: React.FC = () => {
               )}
             </CardContent>
           </Card>
+        </div>
+
+        {/* Upcoming Events Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <UpcomingEvents limit={4} showViewAll={true} />
+          </div>
+          <div className="lg:col-span-1">
+            <Card className="bg-white/90 backdrop-blur-xl border-white/40 shadow-2xl h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-lg">
+                  <div className="bg-gradient-to-r from-orange-500 to-red-600 p-2 rounded-xl">
+                    <Calendar className="h-5 w-5 text-white" />
+                  </div>
+                  Quick Stats
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600 mb-1">
+                      {tokenStatus ? tokenStatus.remaining.toLocaleString() : '0'}
+                    </div>
+                    <div className="text-sm text-blue-600">Tokens Available</div>
+                  </div>
+                  <div className="text-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600 mb-1">
+                      {tokenUsage.reduce((sum, item) => sum + item.total_requests, 0)}
+                    </div>
+                    <div className="text-sm text-green-600">AI Requests Made</div>
+                  </div>
+                  <div className="text-center p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600 mb-1">
+                      {totalTokens.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-purple-600">Total Tokens Used</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

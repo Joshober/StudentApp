@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   images: {
     domains: [],
   },
@@ -8,6 +9,9 @@ const nextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: false,
+  },
+  experimental: {
+    serverComponentsExternalPackages: ['pg', 'redis'],
   },
 }
 

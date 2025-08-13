@@ -3,6 +3,13 @@ export const config = {
   // Database
   database: {
     path: process.env.DATABASE_PATH || 'edulearn.db',
+    url: process.env.DATABASE_URL || 'postgresql://edulearn_user:edulearn_password@localhost:5432/edulearn',
+    ssl: process.env.NODE_ENV === 'production',
+  },
+  
+  // Redis
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
   
   // AI Provider API Keys (OpenRouter only)

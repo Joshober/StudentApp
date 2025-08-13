@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Calendar, Clock, MapPin, Users, Filter, Plus, User, CheckCircle, XCircle, Loader2, AlertCircle, Crown, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +43,7 @@ const typeColors = {
 };
 
 const Events: React.FC = () => {
+  const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [pendingEvents, setPendingEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -813,6 +815,8 @@ const Events: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: index * 0.1 }}
               whileHover={{ y: -5, transition: { duration: 0.2 } }}
+              className="cursor-pointer"
+              onClick={() => router.push(`/events/${event.id}`)}
             >
               <Card className="h-full hover:shadow-lg transition-all duration-300 border-0 shadow-md overflow-hidden">
                 <div className="aspect-[2/1] relative overflow-hidden">
@@ -886,9 +890,22 @@ const Events: React.FC = () => {
                     <div className="text-sm text-gray-600">
                       {event.capacity - event.registered} spots remaining
                     </div>
-                    <Button size="sm">
-                      Register Now
-                    </Button>
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => router.push(`/events/${event.id}`)}
+                      >
+                        View Details
+                      </Button>
+                      <Button 
+                        size="sm"
+                        disabled={event.registered >= event.capacity || !currentUser}
+                        onClick={() => router.push(`/events/${event.id}`)}
+                      >
+                        {event.registered >= event.capacity ? 'Event Full' : 'Register Now'}
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

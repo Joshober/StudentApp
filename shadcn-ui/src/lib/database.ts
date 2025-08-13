@@ -272,6 +272,58 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_events_is_approved ON events(is_approved);
       `);
     }
+  },
+  {
+    version: 7,
+    name: 'Add additional fields to events and update event registrations',
+    up: (db: Database) => {
+      // Add additional fields to events table
+      db.exec(`
+        ALTER TABLE events ADD COLUMN contact_email TEXT;
+      `);
+      
+      db.exec(`
+        ALTER TABLE events ADD COLUMN contact_phone TEXT;
+      `);
+      
+      db.exec(`
+        ALTER TABLE events ADD COLUMN website TEXT;
+      `);
+      
+      db.exec(`
+        ALTER TABLE events ADD COLUMN additional_info TEXT;
+      `);
+      
+      // Update event_registrations table to use user_email instead of user_id
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS event_registrations_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_id INTEGER NOT NULL,
+          user_email TEXT NOT NULL,
+          registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE,
+          UNIQUE(event_id, user_email)
+        )
+      `);
+      
+      // Copy data from old table if it exists
+      db.exec(`
+        INSERT INTO event_registrations_new (event_id, user_email, registered_at)
+        SELECT er.event_id, u.email, er.registered_at
+        FROM event_registrations er
+        JOIN users u ON er.user_id = u.id
+      `);
+      
+      // Drop old table and rename new one
+      db.exec(`DROP TABLE IF EXISTS event_registrations`);
+      db.exec(`ALTER TABLE event_registrations_new RENAME TO event_registrations`);
+      
+      // Create index for event registrations
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_event_registrations_event_id ON event_registrations(event_id);
+        CREATE INDEX IF NOT EXISTS idx_event_registrations_user_email ON event_registrations(user_email);
+      `);
+    }
   }
 ];
 
@@ -541,6 +593,126 @@ export const seedDatabase = () => {
       console.log(`✅ Seeded database with ${sampleResources.length} sample resources`);
     } else {
       console.log('📊 Database already contains resources, skipping seed');
+    }
+
+    // Check if events table is empty
+    const eventCount = db.prepare('SELECT COUNT(*) as count FROM events').get() as { count: number };
+    
+    if (eventCount.count === 0) {
+      console.log('🌱 Seeding database with sample events...');
+      
+      const sampleEvents = [
+        {
+          title: 'AI Workshop: Introduction to Machine Learning',
+          description: 'Join us for a hands-on workshop where you\'ll learn the fundamentals of machine learning and build your first AI model.',
+          date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+          time: '14:00',
+          location: 'Computer Science Building, Room 101',
+          type: 'workshop',
+          capacity: 30,
+          registered: 15,
+          tags: JSON.stringify(['ai', 'machine-learning', 'python', 'workshop']),
+          speaker: 'Dr. Sarah Johnson',
+          image: '/api/placeholder/400/250',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin',
+          is_approved: 1
+        },
+        {
+          title: 'Web Development Networking Event',
+          description: 'Connect with fellow developers, share experiences, and learn about the latest trends in web development.',
+          date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 14 days from now
+          time: '18:00',
+          location: 'Student Center, Conference Room A',
+          type: 'networking',
+          capacity: 50,
+          registered: 28,
+          tags: JSON.stringify(['networking', 'web-development', 'career']),
+          speaker: 'Tech Innovation Club',
+          image: '/api/placeholder/400/250',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin',
+          is_approved: 1
+        },
+        {
+          title: 'Data Science Seminar: Big Data Analytics',
+          description: 'Explore the world of big data analytics and learn how to process and analyze large datasets effectively.',
+          date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 21 days from now
+          time: '16:00',
+          location: 'Engineering Building, Auditorium',
+          type: 'seminar',
+          capacity: 100,
+          registered: 45,
+          tags: JSON.stringify(['data-science', 'big-data', 'analytics']),
+          speaker: 'Prof. Michael Chen',
+          image: '/api/placeholder/400/250',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin',
+          is_approved: 1
+        },
+        {
+          title: 'Cybersecurity Webinar: Protecting Your Digital Life',
+          description: 'Learn essential cybersecurity practices to protect your personal and professional digital assets.',
+          date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 28 days from now
+          time: '19:00',
+          location: 'Online (Zoom)',
+          type: 'webinar',
+          capacity: 200,
+          registered: 120,
+          tags: JSON.stringify(['cybersecurity', 'online-safety', 'webinar']),
+          speaker: 'Security Expert Lisa Rodriguez',
+          image: '/api/placeholder/400/250',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin',
+          is_approved: 1
+        },
+        {
+          title: 'Mobile App Development Workshop',
+          description: 'Build your first mobile app using React Native. No prior experience required!',
+          date: new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 35 days from now
+          time: '13:00',
+          location: 'Innovation Lab, Room 205',
+          type: 'workshop',
+          capacity: 25,
+          registered: 18,
+          tags: JSON.stringify(['mobile-development', 'react-native', 'workshop']),
+          speaker: 'Mobile Developer Alex Thompson',
+          image: '/api/placeholder/400/250',
+          submitter_email: 'admin@example.com',
+          submitter_name: 'Admin',
+          is_approved: 1
+        }
+      ];
+
+      const insertEventStmt = db.prepare(`
+        INSERT INTO events (
+          title, description, date, time, location, type, capacity, registered,
+          tags, speaker, image, submitter_email, submitter_name, is_approved
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      // Insert events
+      for (const event of sampleEvents) {
+        insertEventStmt.run(
+          event.title,
+          event.description,
+          event.date,
+          event.time,
+          event.location,
+          event.type,
+          event.capacity,
+          event.registered,
+          event.tags,
+          event.speaker,
+          event.image,
+          event.submitter_email,
+          event.submitter_name,
+          event.is_approved
+        );
+      }
+      console.log(`✅ Seeded database with ${sampleEvents.length} sample events`);
+    } else {
+      console.log('📊 Database already contains events, skipping seed');
     }
   } catch (error) {
     console.error('❌ Error seeding database:', error);
@@ -1524,6 +1696,7 @@ export class EventService {
     type?: string;
     userEmail?: string;
     isAdmin?: boolean;
+    limit?: number;
   }): any[] {
     try {
       let query = `
@@ -1541,6 +1714,11 @@ export class EventService {
       }
       
       query += ` ORDER BY e.date ASC, e.time ASC`;
+      
+      if (filters.limit) {
+        query += ` LIMIT ?`;
+        params.push(filters.limit);
+      }
       
       const stmt = this.database.prepare(query);
       return stmt.all(...params);
@@ -1612,44 +1790,7 @@ export class EventService {
     }
   }
 
-  updateEvent(id: string, event: {
-    title: string;
-    description: string;
-    date: string;
-    time: string;
-    location: string;
-    type: 'workshop' | 'seminar' | 'networking' | 'webinar';
-    capacity: number;
-    tags: string[];
-    speaker?: string;
-  }): boolean {
-    try {
-      const stmt = this.database.prepare(`
-        UPDATE events SET
-          title = ?, description = ?, date = ?, time = ?, 
-          location = ?, type = ?, capacity = ?, tags = ?, speaker = ?
-        WHERE id = ?
-      `);
-      
-      const result = stmt.run(
-        event.title,
-        event.description,
-        event.date,
-        event.time,
-        event.location,
-        event.type,
-        event.capacity,
-        JSON.stringify(event.tags),
-        event.speaker || null,
-        id
-      );
-      
-      return result.changes > 0;
-    } catch (error) {
-      console.error('Error updating event:', error);
-      return false;
-    }
-  }
+
 
   deleteEvent(id: string): boolean {
     try {
@@ -1727,6 +1868,108 @@ export class EventService {
     } catch (error) {
       console.error('Error getting pending events by user:', error);
       return [];
+    }
+  }
+
+  isUserRegisteredForEvent(eventId: string, userEmail: string): boolean {
+    try {
+      const stmt = this.database.prepare(`
+        SELECT COUNT(*) as count FROM event_registrations 
+        WHERE event_id = ? AND user_email = ?
+      `);
+      const result = stmt.get(eventId, userEmail);
+      return result.count > 0;
+    } catch (error) {
+      console.error('Error checking user registration:', error);
+      return false;
+    }
+  }
+
+  registerUserForEvent(eventId: string, userEmail: string): boolean {
+    try {
+      // First check if user is already registered
+      if (this.isUserRegisteredForEvent(eventId, userEmail)) {
+        return false;
+      }
+
+      // Check if event is full
+      const event = this.getEventById(eventId);
+      if (!event || event.registered >= event.capacity) {
+        return false;
+      }
+
+      // Register the user
+      const stmt = this.database.prepare(`
+        INSERT INTO event_registrations (event_id, user_email, registered_at)
+        VALUES (?, ?, datetime('now'))
+      `);
+      
+      const result = stmt.run(eventId, userEmail);
+      
+      if (result.changes > 0) {
+        // Update the event's registered count
+        const updateStmt = this.database.prepare(`
+          UPDATE events SET registered = registered + 1 WHERE id = ?
+        `);
+        updateStmt.run(eventId);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error registering user for event:', error);
+      return false;
+    }
+  }
+
+  updateEvent(id: string, event: {
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    location: string;
+    type: 'workshop' | 'seminar' | 'networking' | 'webinar';
+    capacity: number;
+    tags: string[];
+    speaker?: string;
+    contact_email?: string;
+    contact_phone?: string;
+    website?: string;
+    additional_info?: string;
+  }): any {
+    try {
+      const stmt = this.database.prepare(`
+        UPDATE events SET
+          title = ?, description = ?, date = ?, time = ?, 
+          location = ?, type = ?, capacity = ?, tags = ?, speaker = ?,
+          contact_email = ?, contact_phone = ?, website = ?, additional_info = ?
+        WHERE id = ?
+      `);
+      
+      const result = stmt.run(
+        event.title,
+        event.description,
+        event.date,
+        event.time,
+        event.location,
+        event.type,
+        event.capacity,
+        JSON.stringify(event.tags),
+        event.speaker || null,
+        event.contact_email || null,
+        event.contact_phone || null,
+        event.website || null,
+        event.additional_info || null,
+        id
+      );
+      
+      if (result.changes > 0) {
+        return this.getEventById(id);
+      }
+      return null;
+    } catch (error) {
+      console.error('Error updating event:', error);
+      return null;
     }
   }
 }

@@ -1,6 +1,44 @@
 # Tech Innovation Club - EduLearn Platform
 
-A modern web application for the Tech Innovation Club, built with Next.js, TypeScript, and shadcn/ui components.
+A modern web application for the Tech Innovation Club, built with Next.js, TypeScript, and shadcn/ui components. Ready for production deployment with Docker and Vercel.
+
+## 🚀 Quick Start
+
+### Option 1: Makefile (Recommended)
+```bash
+# Show all available commands
+make help
+
+# Install dependencies and start development
+make install
+make dev
+
+# Or use the Windows batch file
+make.bat install
+make.bat dev
+```
+
+### Option 2: Docker Scripts
+```bash
+# Windows
+scripts\quick-start.bat
+
+# macOS/Linux
+./scripts/quick-start.sh
+```
+
+### Option 3: Manual Setup
+```bash
+# Install dependencies
+npm install
+
+# Start development environment
+npm run docker:dev
+
+# Access the application
+# Main App: http://localhost:3000
+# Database Admin: http://localhost:5050 (admin@edulearn.com / admin123)
+```
 
 ## Features
 
@@ -74,36 +112,34 @@ src/
 2. **Install dependencies**
    ```bash
    npm install
-   # or
-   yarn install
-   # or
-   pnpm install
    ```
 
 3. **Set up environment variables**
    ```bash
-   cp env.example .env.local
+   cp env.example .env
    ```
 
-   Edit `.env.local` and add your configuration:
+   Edit `.env` and add your configuration:
    ```env
-   # Required for AI features
-   OPENROUTER_API_KEY=your_openrouter_api_key_here
+   # Database Configuration
+   DATABASE_URL=postgresql://edulearn_user:edulearn_password@localhost:5432/edulearn
    
-   # App configuration
+   # Redis Configuration
+   REDIS_URL=redis://localhost:6379
+   
+   # JWT Configuration
+   JWT_SECRET=your-super-secret-jwt-key-change-in-production
+   
+   # AI Provider API Keys
+   OPENROUTER_API_KEY=your-openrouter-api-key-here
+   
+   # App Configuration
    NEXT_PUBLIC_APP_URL=http://localhost:3000
-   
-   # Optional: JWT secret for enhanced security
-   JWT_SECRET=your-super-secret-jwt-key
    ```
 
-4. **Start the development server**
+4. **Start the development environment**
    ```bash
-   npm run dev
-   # or
-   yarn dev
-   # or
-   pnpm dev
+   npm run docker:dev
    ```
 
 5. **Open your browser**
@@ -113,9 +149,11 @@ src/
 
 | Variable | Description | Required |
 |----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `REDIS_URL` | Redis connection string | Yes |
 | `OPENROUTER_API_KEY` | API key for OpenRouter AI services | Yes (for homework help) |
 | `NEXT_PUBLIC_APP_URL` | Your application URL | Yes |
-| `JWT_SECRET` | Secret for JWT tokens | No (optional) |
+| `JWT_SECRET` | Secret for JWT tokens | Yes |
 
 ### Setting Up API Keys
 
@@ -163,6 +201,36 @@ The homework help feature requires an API key to function. You have two options:
 
 ### Available Scripts
 
+#### Makefile Commands (Recommended)
+```bash
+# Development
+make dev             # Start development environment
+make prod            # Start production environment
+make down            # Stop all containers
+make restart         # Restart development environment
+
+# Database
+make db-init         # Initialize database schema
+make db-backup       # Create database backup
+make db-restore      # Restore database from backup
+make db-reset        # Reset database (WARNING: deletes all data)
+
+# Monitoring
+make health          # Check health of all services
+make logs            # Show logs from all containers
+make status          # Show status of all containers
+
+# Utilities
+make shell           # Open shell in application container
+make db-shell        # Open PostgreSQL shell
+make redis-cli       # Open Redis CLI
+
+# Deployment
+make deploy          # Deploy to Vercel
+make deploy-dev      # Deploy to Vercel (development)
+```
+
+#### NPM Scripts
 ```bash
 # Development
 npm run dev          # Start development server
@@ -186,6 +254,33 @@ npm run type-check   # Run TypeScript type checking
 - Use Tailwind CSS classes for styling
 - Global styles in `src/app/globals.css`
 - Component-specific styles using Tailwind utilities
+
+## 🚀 Deployment
+
+### Docker Deployment
+```bash
+# Production build
+npm run docker:prod
+
+# Stop production containers
+npm run docker:prod:down
+```
+
+### Vercel Deployment
+1. **Set up database and Redis** (see [DEPLOYMENT.md](DEPLOYMENT.md))
+2. **Deploy to Vercel:**
+   ```bash
+   npm i -g vercel
+   vercel login
+   vercel --prod
+   ```
+3. **Set environment variables in Vercel dashboard**
+4. **Initialize database:**
+   ```bash
+   curl -X POST https://your-app.vercel.app/api/init-database
+   ```
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Contributing
 
