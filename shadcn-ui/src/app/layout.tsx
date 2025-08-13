@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   title: 'Tech Innovation Club - Powered by ACM',
   description: 'Join the Tech Innovation Club to explore, build, and innovate with the brightest minds on campus.',
   authors: [{ name: 'Tech Innovation Club' }],
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' }
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/manifest.json',
   openGraph: {
     title: 'Tech Innovation Club',
     description: 'Join the Tech Innovation Club to explore, build, and innovate with the brightest minds on campus.',

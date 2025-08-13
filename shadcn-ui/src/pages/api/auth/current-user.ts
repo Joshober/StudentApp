@@ -9,23 +9,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // For now, we'll use a default user email
-    // In a real application, you would get the user from the session/token
-    const defaultEmail = 'user@example.com';
+    // Get user data from cookies (set by OAuth callbacks)
+    const userDataCookie = req.cookies.user_data;
     
+    if (!userDataCookie) {
+      // No authenticated user found
+      return res.status(200).json({
+        success: true,
+        user: null
+      });
+    }
+
+    let userData;
+    try {
+      userData = JSON.parse(userDataCookie);
+    } catch (error) {
+      console.error('Error parsing user data cookie:', error);
+      return res.status(200).json({
+        success: true,
+        user: null
+      });
+    }
+
     // Check if user exists in database
-    let user = userService.findUserByEmail(defaultEmail);
+    let user = userService.findUserByEmail(userData.email);
     
     if (!user) {
       // Create user if doesn't exist
-      const userId = await userService.createUser(defaultEmail, '', 'Test User', undefined, false);
-      user = userService.findUserByEmail(defaultEmail);
+      const userId = await userService.createUser(
+        userData.email, 
+        '', // No password for OAuth users
+        userData.name || userData.email.split('@')[0], 
+        undefined, // No API key initially
+        false // Not admin by default
+      );
+      user = userService.findUserByEmail(userData.email);
+    }
+
+    if (!user) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create or find user'
+      });
     }
 
     // Check if user is admin
-    const isAdmin = userService.isUserAdminByEmail(defaultEmail);
+    const isAdmin = userService.isUserAdminByEmail(userData.email);
     
-    const userData = {
+    const responseData = {
       id: user.id,
       email: user.email,
       name: user.name,
@@ -35,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.status(200).json({
       success: true,
-      user: userData
+      user: responseData
     });
   } catch (error) {
     console.error('Error fetching current user:', error);

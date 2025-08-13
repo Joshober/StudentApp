@@ -7,10 +7,30 @@ const userService = new UserService();
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     try {
-      // Get current user from session/cookie (for testing, use admin email)
+      // Get current user from session/cookie
+      const userDataCookie = req.cookies.user_data;
+      
+      if (!userDataCookie) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      let userData;
+      try {
+        userData = JSON.parse(userDataCookie);
+      } catch (error) {
+        console.error('Error parsing user data cookie:', error);
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid user session'
+        });
+      }
+
       const currentUser = {
-        email: 'jobersteadt@outlook.com',
-        name: 'Admin User'
+        email: userData.email,
+        name: userData.name || userData.email.split('@')[0]
       };
 
       const {

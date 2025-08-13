@@ -10,26 +10,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userEmail } = req.query;
-
-    if (!userEmail) {
-      return res.status(400).json({
+    // Get current user from session/cookie
+    const userDataCookie = req.cookies.user_data;
+    
+    if (!userDataCookie) {
+      return res.status(401).json({
         success: false,
-        error: 'User email is required'
+        error: 'User not authenticated'
+      });
+    }
+
+    let userData;
+    try {
+      userData = JSON.parse(userDataCookie);
+    } catch (error) {
+      console.error('Error parsing user data cookie:', error);
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid user session'
       });
     }
 
     // Check if user is admin
-    const isAdmin = userService.isUserAdminByEmail(userEmail as string);
+    const isAdmin = userService.isUserAdminByEmail(userData.email);
     
-    let pendingResources;
-    if (isAdmin) {
-      // Admins can see all pending resources
-      pendingResources = resourceService.getPendingResources();
-    } else {
-      // Regular users can only see their own pending resources
-      pendingResources = resourceService.getPendingResourcesByUser(userEmail as string);
+    if (!isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Admin access required'
+      });
     }
+
+    // Get all pending resources (admin can see all pending resources)
+    const pendingResources = resourceService.getPendingResources();
     
     res.status(200).json({
       success: true,

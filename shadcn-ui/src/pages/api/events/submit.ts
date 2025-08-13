@@ -32,9 +32,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Get current user from session/cookie (for now, use regular user email for testing)
-    const currentUserEmail = 'user@example.com'; // In real app, get from session
-    const currentUserName = 'Regular User';
+    // Get current user from session/cookie
+    const userDataCookie = req.cookies.user_data;
+    
+    if (!userDataCookie) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    let userData;
+    try {
+      userData = JSON.parse(userDataCookie);
+    } catch (error) {
+      console.error('Error parsing user data cookie:', error);
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid user session'
+      });
+    }
+
+    const currentUserEmail = userData.email;
+    const currentUserName = userData.name || userData.email.split('@')[0];
 
     // Check if the submitter is an admin
     const isAdmin = userService.isUserAdminByEmail(currentUserEmail);

@@ -142,7 +142,7 @@ const Events: React.FC = () => {
     if (!currentUser?.email) return;
     
     try {
-      const response = await fetch(`/api/events/pending?userEmail=${currentUser.email}`);
+      const response = await fetch('/api/events/pending');
       const data = await response.json();
 
       if (data.success) {
@@ -263,8 +263,7 @@ const Events: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventId,
-          userEmail: currentUser?.email
+          eventId
         }),
       });
 
@@ -305,8 +304,7 @@ const Events: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventId,
-          userEmail: currentUser?.email
+          eventId
         }),
       });
 

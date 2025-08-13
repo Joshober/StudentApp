@@ -139,7 +139,7 @@ const Resources: React.FC = () => {
     if (!currentUser?.email) return;
     
     try {
-      const response = await fetch(`/api/resources/pending?userEmail=${currentUser.email}`);
+      const response = await fetch('/api/resources/pending');
       const data = await response.json();
 
       if (data.success) {
@@ -260,8 +260,7 @@ const Resources: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          resourceId,
-          userEmail: currentUser?.email
+          resourceId
         }),
       });
 
@@ -302,8 +301,7 @@ const Resources: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          resourceId,
-          userEmail: currentUser?.email
+          resourceId
         }),
       });
 
