@@ -4,12 +4,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import ClientProviders from './ClientProviders';
-import DatabaseInitializer from '@/components/DatabaseInitializer';
-import { AuthProvider } from '@/context/AuthContext';
-import { AISettingsProvider } from '@/context/AISettingsContext';
-import { StudySessionProvider } from '@/context/StudySessionContext';
-import { initializeDatabase } from '@/lib/database';
-import { cronService } from '@/lib/cron';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -34,7 +28,6 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <ClientProviders>
           <TooltipProvider>
-            <DatabaseInitializer />
             <div className="min-h-screen bg-background">
               {children}
             </div>
