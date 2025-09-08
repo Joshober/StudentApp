@@ -50,3 +50,4 @@ pnpm-lock.yaml
 *.pyc
 __pycache__
 shadcn-ui/edulearn.db-shm
+shadcn-ui/edulearn.db-wal
